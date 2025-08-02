@@ -40,9 +40,18 @@
       padding: 5px;
     }
     #pasteArea {
-      position: absolute;
-      top: -1000px;
-      opacity: 0;
+      display: none;
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+      border: 2px dashed #4caf50;
+      background: #eaffea;
+      color: #222;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-sizing: border-box;
+      text-align: center;
+      padding: 10px;
     }
   </style>
 </head>
@@ -53,7 +62,10 @@
   <button onclick="showPasteArea()">📋 Tap to Paste</button>
 
   <!-- Visible textarea for pasting -->
-  <textarea id="pasteArea" placeholder="Long press and Paste image URL here" style="display:none;width:100%;height:40px;font-size:16px;"></textarea>
+  <textarea
+    id="pasteArea"
+    placeholder="Long press here and tap Paste"
+  ></textarea>
 
   <div class="image-container" id="imageContainer"></div>
 
