@@ -1,21 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Image Rating Demo</title>
+  <meta charset="UTF-8">
+  <title>Paste & Rate</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
-      background: #f0f0f0;
+      background: #f8f8f8;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      border: none;
+      background-color: #4caf50;
+      color: white;
+      border-radius: 6px;
     }
     .image-container {
-      margin-top: 20px;
+      margin-top: 10px;
     }
     .img-box {
       display: flex;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       background: white;
       padding: 10px;
       border-radius: 10px;
@@ -30,15 +39,31 @@
       font-size: 16px;
       padding: 5px;
     }
+    #pasteArea {
+      position: absolute;
+      top: -1000px;
+      opacity: 0;
+    }
   </style>
 </head>
 <body>
-  <h2>Paste Image (Ctrl+V) from Google</h2>
-  <p>Copy any image (not URL), then paste it here.</p>
+
+  <h2>Paste an Image (Mobile or Desktop)</h2>
+  <p>📱 On phone: Tap the button below, then long press & paste</p>
+  <button onclick="focusPaste()">📋 Tap to Paste</button>
+
+  <!-- Hidden textarea to capture pasted content -->
+  <textarea id="pasteArea" placeholder="Paste here"></textarea>
 
   <div class="image-container" id="imageContainer"></div>
 
   <script>
+    function focusPaste() {
+      const area = document.getElementById('pasteArea');
+      area.focus();
+      alert('Long press and tap "Paste" to insert image.');
+    }
+
     document.addEventListener('paste', (event) => {
       const items = event.clipboardData.items;
       for (let item of items) {
@@ -67,5 +92,6 @@
       }
     });
   </script>
+
 </body>
 </html>
