@@ -19,28 +19,29 @@
       border-radius: 6px;
     }
     .image-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: flex-start;
-    }
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
 
-    .img-box {
-      background: white;
-      border-radius: 8px;
-      padding: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      max-width: 45vw; /* Keeps them from being too huge on wider screens */
-      flex-grow: 1;
-    }
+.img-box {
+  flex: 0 1 48%; /* Try to take up 48% of the row, but don't grow or shrink */
+  box-sizing: border-box;
+  background: white;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
 
-    .img-box img {
-      display: block;
-      width: 100%;
-      height: auto; /* Maintains aspect ratio */
-      object-fit: contain;
-      border-radius: 6px;
-    }
+.img-box img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  border-radius: 6px;
+}
 
 
     select {
