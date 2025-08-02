@@ -23,7 +23,8 @@
     }
     .img-box {
       display: flex;
-      align-items: center;
+      flex-direction: column; /* Stack image and rating vertically */
+      align-items: flex-start;
       margin-bottom: 15px;
       background: white;
       padding: 10px;
@@ -31,9 +32,13 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .img-box img {
-      max-height: 150px;
+      max-height: 320px;   /* Increased from 150px */
+      max-width: 90vw;     /* Responsive width for mobile */
       margin-right: 15px;
       border-radius: 8px;
+      object-fit: contain; /* Ensures image scales nicely */
+      background: #eee;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     select {
       font-size: 16px;
