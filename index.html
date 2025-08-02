@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Rating Demo</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .image-container {
+      margin-top: 20px;
+    }
+    .img-box {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .img-box img {
+      max-height: 150px;
+      margin-right: 15px;
+      border-radius: 8px;
+    }
+    select {
+      font-size: 16px;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Paste Image (Ctrl+V) from Google</h2>
+  <p>Copy any image (not URL), then paste it here.</p>
+
+  <div class="image-container" id="imageContainer"></div>
+
+  <script>
+    document.addEventListener('paste', (event) => {
+      const items = event.clipboardData.items;
+      for (let item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const file = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const container = document.getElementById('imageContainer');
+            const div = document.createElement('div');
+            div.className = 'img-box';
+            div.innerHTML = `
+              <img src="${e.target.result}" />
+              <div>
+                <label>Rating:
+                  <select>
+                    <option value="">--Rate--</option>
+                    ${[...Array(10)].map((_, i) => `<option>${i + 1}</option>`).join('')}
+                  </select>
+                </label>
+              </div>
+            `;
+            container.prepend(div);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
