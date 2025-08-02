@@ -50,47 +50,49 @@
 
   <h2>Paste an Image (Mobile or Desktop)</h2>
   <p>📱 On phone: Tap the button below, then long press & paste</p>
-  <button onclick="focusPaste()">📋 Tap to Paste</button>
+  <button onclick="showPasteArea()">📋 Tap to Paste</button>
 
-  <!-- Hidden textarea to capture pasted content -->
-  <textarea id="pasteArea" placeholder="Paste here"></textarea>
+  <!-- Visible textarea for pasting -->
+  <textarea id="pasteArea" placeholder="Long press and Paste image URL here" style="display:none;width:100%;height:40px;font-size:16px;"></textarea>
 
   <div class="image-container" id="imageContainer"></div>
 
   <script>
-    function focusPaste() {
+    function showPasteArea() {
       const area = document.getElementById('pasteArea');
+      area.value = '';
+      area.style.display = 'block';
       area.focus();
-      alert('Long press and tap "Paste" to insert image.');
+      alert('Long press in the box and tap "Paste" to insert image.');
     }
 
-    document.addEventListener('paste', (event) => {
-      const items = event.clipboardData.items;
-      for (let item of items) {
-        if (item.type.indexOf('image') === 0) {
-          const file = item.getAsFile();
-          const reader = new FileReader();
-          reader.onload = function (e) {
-            const container = document.getElementById('imageContainer');
-            const div = document.createElement('div');
-            div.className = 'img-box';
-            div.innerHTML = `
-              <img src="${e.target.result}" />
-              <div>
-                <label>Rating:
-                  <select>
-                    <option value="">--Rate--</option>
-                    ${[...Array(10)].map((_, i) => `<option>${i + 1}</option>`).join('')}
-                  </select>
-                </label>
-              </div>
-            `;
-            container.prepend(div);
-          };
-          reader.readAsDataURL(file);
-        }
+    // Listen for paste or input in the textarea
+    document.getElementById('pasteArea').addEventListener('input', function() {
+      const text = this.value.trim();
+      if (text.startsWith('http://') || text.startsWith('https://')) {
+        addImageToContainer(text);
+        this.style.display = 'none';
+        this.value = '';
       }
     });
+
+    function addImageToContainer(src) {
+      const container = document.getElementById('imageContainer');
+      const div = document.createElement('div');
+      div.className = 'img-box';
+      div.innerHTML = `
+        <img src="${src}" />
+        <div>
+          <label>Rating:
+            <select>
+              <option value="">--Rate--</option>
+              ${[...Array(10)].map((_, i) => `<option>${i + 1}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+      `;
+      container.prepend(div);
+    }
   </script>
 
 </body>
