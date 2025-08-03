@@ -1,41 +1,37 @@
-// App.jsx
-import { useEffect, useState } from 'react';
-import { auth, provider } from './firebase';
-import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import { useEffect, useState } from "react";
+import { auth, provider, db } from "./firebase";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import Sidebar from "./components/Sidebar";
 
 function App() {
   const [user, setUser] = useState(null);
-
-  const login = async () => {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      console.log("Logged in:", result.user);
-    } catch (err) {
-      console.error("Login error", err);
-    }
-  };
-
-  const logout = () => {
-    signOut(auth);
-  };
+  const [selected, setSelected] = useState("My Boards");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-    });
-    return unsub;
+    return onAuthStateChanged(auth, setUser);
   }, []);
 
-  return (
-    <div style={{ padding: '2rem' }}>
-      {user ? (
-        <>
-          <p>👋 Welcome, {user.displayName}</p>
-          <button onClick={logout}>Logout</button>
-        </>
-      ) : (
+  const login = () => signInWithPopup(auth, provider);
+  const logout = () => signOut(auth);
+
+  if (!user) {
+    return (
+      <div style={{ padding: "2rem" }}>
         <button onClick={login}>Login with Google</button>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex" }}>
+      <Sidebar selected={selected} setSelected={setSelected} />
+      <div style={{ flexGrow: 1, padding: "2rem" }}>
+        <p>👋 Welcome, {user.displayName}</p>
+        <button onClick={logout}>Logout</button>
+
+        <h2>{selected}</h2>
+        {/* Later we'll render BoardList here based on selected */}
+      </div>
     </div>
   );
 }
