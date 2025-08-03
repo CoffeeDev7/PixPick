@@ -87,7 +87,8 @@ export default function App() {
             transition: 'transform 0.3s ease',
             position: 'absolute',
             left: 0,
-            top: 0
+            top: 0,
+            backgroundColor:'#e3f2fd'
           }}
         >
           <Sidebar selected={selected} setSelected={setSelected} setSidebarVisible={setSidebarVisible} />
