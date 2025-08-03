@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { db } from '../firebase';
 import {
   doc,
+  getDoc,
   collection,
   addDoc,
   onSnapshot,
@@ -15,12 +16,9 @@ import {
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const [images, setImages] = useState([]);
-  const pasteRef = useRef();
+  const [boardTitle, setBoardTitle] = useState("");
 
-  useEffect(() => {
-    // Auto-focus paste area
-    pasteRef.current?.focus();
-  }, []);
+  const pasteRef = useRef();
 
   useEffect(() => {
     const q = query(
@@ -33,6 +31,21 @@ export default function BoardPage({ user }) {
     });
     return () => unsubscribe();
   }, [boardId]);
+
+  useEffect(() => {
+  const fetchBoardTitle = async () => {
+    const boardRef = doc(db, 'boards', boardId);
+    const boardSnap = await getDoc(boardRef);
+    if (boardSnap.exists()) {
+      const data = boardSnap.data();
+      setBoardTitle(data.title || "(Untitled)");
+    } else {
+      setBoardTitle("(Board not found)");
+    }
+  };
+  fetchBoardTitle();
+}, [boardId]);
+
 
   const handlePaste = async (event) => {
     let handled = false;
@@ -78,7 +91,7 @@ export default function BoardPage({ user }) {
 
   return (
     <div>
-      <h2>📋 Board: {boardId}</h2>
+      <h2>📋 {boardTitle} <span style={{ fontSize: '0.9rem', color: '#888' }}>({boardId})</span></h2>
       <p>📱 On phone: Tap the green box, then long press to paste</p>
       <textarea
         ref={pasteRef}
