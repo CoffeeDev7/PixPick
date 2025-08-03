@@ -2,7 +2,8 @@ export default function Sidebar({ selected, setSelected }) {
   const tabs = ["My Boards", "Shared with Me", "All Boards"];
 
   return (
-    <div>
+    <div style={{
+      marginTop: '60px',}}>
       {tabs.map(tab => (
         <div
           key={tab}
@@ -11,7 +12,8 @@ export default function Sidebar({ selected, setSelected }) {
             cursor: 'pointer',
             background: selected === tab ? '#ddd' : 'transparent',
             borderRadius: '6px',
-            marginBottom: '0.5rem'
+            marginBottom: '0.5rem',
+            marginTop: '0.5rem',
           }}
           onClick={() => setSelected(tab)}
         >
