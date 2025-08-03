@@ -1,5 +1,16 @@
-export default function Sidebar({ selected, setSelected }) {
+import { useNavigate } from "react-router-dom";
+
+export default function Sidebar({ selected, setSelected, setSidebarVisible }) {
   const tabs = ["My Boards", "Shared with Me", "All Boards"];
+  const navigate = useNavigate();
+
+  const handleTabClick = (tab) => {
+    setSelected(tab);
+    navigate('/');
+    setSidebarVisible(false);
+  }
+
+  
 
   return (
     <div style={{
@@ -15,7 +26,7 @@ export default function Sidebar({ selected, setSelected }) {
             marginBottom: '0.5rem',
             marginTop: '0.5rem',
           }}
-          onClick={() => setSelected(tab)}
+          onClick={() => handleTabClick(tab)}
         >
           {tab}
         </div>

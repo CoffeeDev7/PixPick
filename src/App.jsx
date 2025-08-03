@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Link, Routes, Route, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
 import CreateBoardModal from './components/CreateBoardModal';
@@ -6,6 +6,7 @@ import BoardPage from './components/BoardPage';
 import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
+
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -47,7 +48,14 @@ export default function App() {
         >
           ☰
         </button>
-        <h2 style={{ margin: 0, flexGrow: 1 }}>PixPick</h2>
+        <Link to="/" style={{
+  textDecoration: 'none',
+  color: 'inherit',
+  flexGrow: 1
+}}>
+  <h2 style={{ margin: 0 }}>PixPick</h2>
+</Link>
+
         <button onClick={logout}>Logout</button>
       </div>
 
@@ -76,7 +84,7 @@ export default function App() {
               boxShadow: '2px 0 6px rgba(0,0,0,0.2)'
             }}
           >
-            <Sidebar selected={selected} setSelected={setSelected} />
+            <Sidebar selected={selected} setSelected={setSelected} setSidebarVisible={setSidebarVisible} />
           </div>
         </div>
       )}
@@ -86,6 +94,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={
             <>
+              <h3>Welcome, {user.displayName}, to PixPick <strong>{user.uid}</strong></h3>
+              <h5>{user.email}</h5>
               <h3>{selected}</h3>
               <CreateBoardModal user={user} onCreate={() => {}} />
               <BoardList user={user} selected={selected} />
