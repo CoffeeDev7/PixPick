@@ -13,8 +13,7 @@ export default function Sidebar({ selected, setSelected, setSidebarVisible }) {
   
 
   return (
-    <div style={{
-      marginTop: '60px',}}>
+    <div style={{ marginTop: '60px',}}>
       {tabs.map(tab => (
         <div
           key={tab}

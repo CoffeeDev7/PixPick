@@ -24,7 +24,7 @@ export default function App() {
     <div style={{ margin:0, padding:0, bordersizing: 'border-box'}}>
       {/* Top Gray Header */}
       <div style={{
-        backgroundColor: '#eee',
+        backgroundColor: '#42a5f5',
         padding: '12px 20px',
         display: 'flex',
         justifyContent: 'space-between',
@@ -60,34 +60,40 @@ export default function App() {
       </div>
 
       {/* Sidebar Modal Overlay */}
-      {sidebarVisible && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: sidebarVisible ? 'rgba(0,0,0,0.3)' : 'transparent',
+          pointerEvents: sidebarVisible ? 'auto' : 'none',
+          transition: 'background-color 0.3s ease',
+          zIndex: 100
+        }}
+        onClick={() => setSidebarVisible(false)}
+      >
         <div
-          onClick={() => setSidebarVisible(false)}
+          onClick={(e) => e.stopPropagation()}
           style={{
-            position: 'fixed',
-            top: 0,
+            width: '220px',
+            height: '100%',
+            background: '#f5f5f5',
+            padding: '1rem',
+            boxSizing: 'border-box',
+            boxShadow: '2px 0 6px rgba(0,0,0,0.2)',
+            transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.3s ease',
+            position: 'absolute',
             left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            zIndex: 100
+            top: 0
           }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '250px',
-              height: '100%',
-              background: '#f5f5f5',
-              padding: '1rem',
-              boxSizing: 'border-box',
-              boxShadow: '2px 0 6px rgba(0,0,0,0.2)'
-            }}
-          >
-            <Sidebar selected={selected} setSelected={setSelected} setSidebarVisible={setSidebarVisible} />
-          </div>
+          <Sidebar selected={selected} setSelected={setSelected} setSidebarVisible={setSidebarVisible} />
         </div>
-      )}
+      </div>
+
 
       {/* Main Content Area */}
       <div style={{ paddingTop: '60px', padding: '2rem' }}>
