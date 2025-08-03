@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
-import { auth, provider, db } from "./firebase";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import BoardList from './components/BoardList';
+import CreateBoardModal from './components/CreateBoardModal';
+import BoardPage from './components/BoardPage';
+import { auth, provider } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 
-import Sidebar from "./components/Sidebar";
-import CreateBoardModal from "./components/CreateBoardModal";
-import BoardList from "./components/BoardList";
-import BoardPage from "./components/BoardPage";
-
-function App() {
+export default function App() {
   const [user, setUser] = useState(null);
   const [selected, setSelected] = useState("My Boards");
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
@@ -19,32 +19,81 @@ function App() {
 
   if (!user) return <div style={{ padding: '2rem' }}><button onClick={login}>Login with Google</button></div>;
 
-
   return (
-    <div style={{ display: "flex" }}>
-      <Sidebar selected={selected} setSelected={setSelected} />
-      <div style={{ flexGrow: 1, padding: "2rem" }}>
+    <div style={{ margin:0, padding:0, bordersizing: 'border-box'}}>
+      {/* Top Gray Header */}
+      <div style={{
+        backgroundColor: '#eee',
+        padding: '12px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        top: 0,
+        height: '60px',
+        zIndex: 10
+      }}>
+        <button
+          onClick={() => setSidebarVisible(true)}
+          style={{
+            fontSize: '24px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            marginRight: '16px'
+          }}
+        >
+          ☰
+        </button>
+        <h2 style={{ margin: 0, flexGrow: 1 }}>PixPick</h2>
+        <button onClick={logout}>Logout</button>
+      </div>
+
+      {/* Sidebar Modal Overlay */}
+      {sidebarVisible && (
+        <div
+          onClick={() => setSidebarVisible(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            zIndex: 100
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '250px',
+              height: '100%',
+              background: '#f5f5f5',
+              padding: '1rem',
+              boxSizing: 'border-box',
+              boxShadow: '2px 0 6px rgba(0,0,0,0.2)'
+            }}
+          >
+            <Sidebar selected={selected} setSelected={setSelected} />
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div style={{ paddingTop: '60px', padding: '2rem' }}>
         <Routes>
           <Route path="/" element={
             <>
-              <p>👋 Welcome, {user.displayName}, {user.email}</p>
-              <p>user id: <strong>{user.uid}</strong></p>
-              {console.log("User:", user, "User ID:", user.uid)}
-              <button onClick={logout}>Logout</button>
-
-              <h2>{selected}</h2>
+              <h3>{selected}</h3>
               <CreateBoardModal user={user} onCreate={() => {}} />
               <BoardList user={user} selected={selected} />
-              {/* Render the board list based on the selected tab */}
-              {/* This will show "My Boards", "Shared with Me", or "All Boards" */}
-
-              {/* Later we'll render BoardList here based on selected */}
-            </>}/>
+            </>
+          } />
           <Route path="/board/:id" element={<BoardPage user={user} />} />
         </Routes>
       </div>
     </div>
   );
 }
-
-export default App;

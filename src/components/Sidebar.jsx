@@ -1,17 +1,8 @@
-import { useState } from "react";
-
 export default function Sidebar({ selected, setSelected }) {
   const tabs = ["My Boards", "Shared with Me", "All Boards"];
 
   return (
-    <div style={{
-      width: '220px',
-      minHeight: '100vh',
-      background: '#f5f5f5',
-      padding: '1rem',
-      boxSizing: 'border-box'
-    }}>
-      <h2 style={{ marginBottom: '1rem' }}>PixPick</h2>
+    <div>
       {tabs.map(tab => (
         <div
           key={tab}

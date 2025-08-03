@@ -90,7 +90,7 @@ export default function BoardPage({ user }) {
   };
 
   return (
-    <div>
+    <div style={{ marginTop: '60px' }}> {/* 60PX IS THE HEIGHT OF THE HEADER */}
       <h2>📋 {boardTitle} <span style={{ fontSize: '0.9rem', color: '#888' }}>({boardId})</span></h2>
       <p>📱 On phone: Tap the green box, then long press to paste</p>
       <textarea
