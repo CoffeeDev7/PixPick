@@ -92,7 +92,7 @@ export default function BoardPage({ user }) {
   return (
     <div style={{ marginTop: '60px' }}> {/* 60PX IS THE HEIGHT OF THE HEADER */}
       <h2>📋 {boardTitle} <span style={{ fontSize: '0.9rem', color: '#888' }}>({boardId})</span></h2>
-      <p>📱 On phone: Tap the green box, then long press to paste</p>
+      {/* <p>📱 On phone: Tap the green box, then long press to paste</p> */}
       <textarea
         ref={pasteRef}
         placeholder="Long press and tap Paste"
@@ -120,11 +120,11 @@ export default function BoardPage({ user }) {
       }}>
         {images.map((img) => (
           <div key={img.id} className="img-box" style={{
-            flex: '0 1 48%',
+            flex: '0 1 calc(50% - 6px)',
             boxSizing: 'border-box',
             background: 'white',
             borderRadius: '8px',
-            padding: '8px',
+            
             marginBottom: '12px',
             boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
           }}>
@@ -135,7 +135,9 @@ export default function BoardPage({ user }) {
               
               borderRadius: '6px'
             }} />
-            <select
+
+            {/* SKIP RATING FOR NOW */}
+            {/* <select
               value={img.rating || ''}
               onChange={(e) => handleRatingChange(img.id, e.target.value)}
               style={{
@@ -156,7 +158,7 @@ export default function BoardPage({ user }) {
               <option value="8">8</option>
               <option value="9">9</option>
               <option value="10">10</option>
-            </select>
+            </select> */}
           </div>
         ))}
       </div>
