@@ -33,7 +33,7 @@ export default function CreateBoardModal({ user, onCreate }) {
           marginRight: '0.5rem'
         }}
       />
-      <button onClick={createBoard}>+ Create Board</button>
+      <button onClick={createBoard} style={{ backgroundColor: '#3debabff', borderRadius: '26px'}}>+ Create Board</button>
     </div>
   );
 }

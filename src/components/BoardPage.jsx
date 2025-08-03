@@ -132,7 +132,7 @@ export default function BoardPage({ user }) {
               width: '100%',
               height: 'auto',
               display: 'block',
-              objectFit: 'contain',
+              
               borderRadius: '6px'
             }} />
             <select
