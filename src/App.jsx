@@ -6,6 +6,7 @@ import BoardPage from './components/BoardPage';
 import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
+import LoginPage from './components/LoginPage';
 
 
 export default function App() {
@@ -18,7 +19,7 @@ export default function App() {
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  if (!user) return <div style={{ padding: '2rem' }}><button onClick={login}>Login with Google</button></div>;
+  if (!user) return <LoginPage login={login}/>
 
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>

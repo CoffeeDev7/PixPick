@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState,useRef } from 'react';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -63,6 +63,22 @@ const handleDelete = (boardId) => {
   }
 };
 
+const menuRef = useRef();
+
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (menuRef.current && !menuRef.current.contains(e.target)) {
+      setMenuOpenFor(null); // close the menu
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
+
+
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
@@ -113,6 +129,7 @@ const handleDelete = (boardId) => {
           {/* Dropdown Menu */}
       {menuOpenFor === board.id && (
         <div
+          ref={menuRef}
           style={{
             position: "absolute",
             top: "40px",
