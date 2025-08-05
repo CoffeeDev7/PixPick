@@ -79,4 +79,5 @@ html, body, #root {
   box-sizing: border-box;
   height: 100%;
   width: 100%;
+  user-select: none; /* GLOBALLY DISABLE TEXT SELECTION FOR LONG PRESS. ITS JUST ANNOYING IN MOBILE CHROME. */
 }

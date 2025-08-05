@@ -63,7 +63,28 @@ export default function App() {
           <h2 style={{ margin: 0 }}>PixPick</h2>
         </Link>
 
-        <button style={{marginRight: "12px"}} onClick={logout}>Logout</button>
+        <button
+          onClick={logout}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#e0e0e0", // light grey
+            color: "#333",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            marginRight: "12px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+            transition: "background 0.2s ease",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#d5d5d5")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#e0e0e0")
+          }
+        >
+          Logout
+        </button>
       </div>
 
       {/* Sidebar Modal Overlay */}
@@ -110,7 +131,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{padding: "2rem",marginTop: "60px"}}>
+      <div style={{ padding: "2rem", marginTop: "60px" }}>
         <Routes>
           <Route
             path="/"
@@ -120,7 +141,7 @@ export default function App() {
                   Welcome, {user.displayName}, to PixPick{" "}
                   <strong>{user.uid}</strong>
                 </h3>
-                <h5>{user.email}</h5>
+                <h4>{user.email}</h4>
                 <h3>{selected}</h3>
                 <CreateBoardModal user={user} onCreate={() => {}} />
                 <BoardList user={user} selected={selected} />

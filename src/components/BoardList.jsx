@@ -94,6 +94,7 @@ useEffect(() => {
             borderRadius: "8px",
             background: "#fff",
             cursor: "pointer",
+            userSelect: "none",
           }}
         >
           <div

@@ -150,9 +150,9 @@ export default function BoardPage({ user }) {
 
   return (
     <div style={{ marginTop: "5px" }}>
-      <h2 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+      <h2 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", userSelect: "none" }}>
          {boardTitle}{" "} 
-        <span style={{ fontSize: "0.9rem", color: "#888" }}>{images.length} {images.length === 1 ? "pick" : "picks"}</span>
+        <span style={{ fontSize: "0.9rem", color: "#888", }}>{images.length} {images.length === 1 ? "pick" : "picks"}</span>
       </h2>
 
       <textarea
