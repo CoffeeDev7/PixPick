@@ -126,6 +126,27 @@ export default function BoardPage({ user }) {
     touchEndX.current = null;
   };
 
+  useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (modalIndex === null) return;
+
+    if (e.key === "ArrowLeft") {
+      setModalIndex((prev) =>
+        prev === 0 ? (images.length - 1) : prev - 1
+      );
+    } else if (e.key === "ArrowRight") {
+      setModalIndex((prev) =>
+        prev === images.length - 1 ? 0 : prev + 1
+      );
+    } else if (e.key === "Escape") {
+      setModalIndex(null);
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, [modalIndex, images.length]);
+
   return (
     <div style={{ marginTop: "60px" }}>
       <h2>
