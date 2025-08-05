@@ -126,6 +126,7 @@ export default function BoardPage({ user }) {
     touchEndX.current = null;
   };
 
+  // keyword navigation
   useEffect(() => {
   const handleKeyDown = (e) => {
     if (modalIndex === null) return;
@@ -148,10 +149,10 @@ export default function BoardPage({ user }) {
 }, [modalIndex, images.length]);
 
   return (
-    <div style={{ marginTop: "60px" }}>
-      <h2>
-        📋 {boardTitle}{" "}
-        <span style={{ fontSize: "0.9rem", color: "#888" }}>({boardId})</span>
+    <div style={{ marginTop: "5px" }}>
+      <h2 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+         {boardTitle}{" "} 
+        <span style={{ fontSize: "0.9rem", color: "#888" }}>{images.length} {images.length === 1 ? "pick" : "picks"}</span>
       </h2>
 
       <textarea

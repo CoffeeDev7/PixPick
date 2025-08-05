@@ -22,7 +22,7 @@ export default function App() {
 
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
-      {/* Top Gray Header */}
+      {/* TOP GRAY HEADER */}
       <div
         style={{
           backgroundColor: "#42a5f5",
@@ -62,7 +62,7 @@ export default function App() {
           <h2 style={{ margin: 0 }}>PixPick</h2>
         </Link>
 
-        <button onClick={logout}>Logout</button>
+        <button style={{marginRight: "12px"}} onClick={logout}>Logout</button>
       </div>
 
       {/* Sidebar Modal Overlay */}
