@@ -26,7 +26,7 @@ export default function App() {
       <div
         style={{
           backgroundColor: "#42a5f5",
-          padding: "12px 20px",
+          padding: "12px 0",
           display: "flex",
           alignItems: "center",
           gap: "12px",
@@ -45,6 +45,7 @@ export default function App() {
             background: "transparent",
             border: "none",
             cursor: "pointer",
+            marginLeft: "-12px",
           }}
         >
           ☰
@@ -108,7 +109,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ paddingTop: "60px", padding: "2rem" }}>
+      <div style={{padding: "2rem",marginTop: "60px"}}>
         <Routes>
           <Route
             path="/"
