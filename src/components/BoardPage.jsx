@@ -18,6 +18,12 @@ export default function BoardPage({ user }) {
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState("");
   const [modalsrc, setModalsrc] = useState(null);
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 5000); // toast disappears after 5 seconds
+  };
 
   const pasteRef = useRef();
 
@@ -47,32 +53,55 @@ export default function BoardPage({ user }) {
     fetchBoardTitle();
   }, [boardId]);
 
-  const handlePaste = async (event) => {
-    let handled = false;
-    if (event.clipboardData && event.clipboardData.items) {
-      for (let item of event.clipboardData.items) {
-        if (item.type.indexOf("image") === 0) {
-          const file = item.getAsFile();
-          const reader = new FileReader();
-          reader.onload = async function (e) {
-            await saveImageToFirestore(e.target.result);
-          };
-          reader.readAsDataURL(file);
-          handled = true;
-        }
+ const handlePaste = async (event) => {
+  let handled = false;
+  const text = event.clipboardData.getData("text");
+  console.log("📋 Pasted text:", text);
+
+  if (event.clipboardData && event.clipboardData.items) {
+    for (let item of event.clipboardData.items) {
+      if (item.type.indexOf("image") === 0) {
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+          await saveImageToFirestore(e.target.result);
+        };
+        reader.readAsDataURL(file);
+        handled = true;
       }
     }
+  }
 
-    if (!handled) {
-      const text = event.clipboardData.getData("text");
-      if (text && (text.startsWith("http://") || text.startsWith("https://"))) {
-        await saveImageToFirestore(text);
-      }
-    }
+  // Regex matchers
+  const isGoogleRedirect = /google\.com\/imgres.*[?&]imgurl=/i.test(text);
+  const isGoogleImageProxy = /images\.app\.goo\.gl/i.test(text);
+  const isBrokenGoogleImageCopy = /google\.com\/url\?sa=i/i.test(text);
+  const isDirectImageLink = /^https?:\/\/.+\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(text);
 
-    if (handled) event.preventDefault();
-    event.target.value = "";
-  };
+  if (isGoogleImageProxy) {
+    showToast(
+      "⚠️ Can't preview this Google image link. Open it in browser, then copy image directly."
+    );
+    handled = true;
+  } else if (isBrokenGoogleImageCopy) {
+    showToast(
+      "⚠️ 'Copy Link Address' from Google Images doesn't work. Try 'Copy Image or Copy Image Address' instead."
+    );
+    handled = true;
+  } else if (isGoogleRedirect) {
+    showToast(
+      "⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'."
+    );
+    handled = true;
+  } else if (isDirectImageLink || text.startsWith("data:image/")) {
+    await saveImageToFirestore(text);
+    handled = true;
+  }
+
+  if (handled) event.preventDefault();
+  event.target.value = "";
+};
+
 
   const saveImageToFirestore = async (src) => {
     const imageRef = collection(db, "boards", boardId, "images");
@@ -183,6 +212,63 @@ export default function BoardPage({ user }) {
           </div>
         ))}
       </div>
+
+      {/* TOAST NOTIFICATIONS */}
+{toast && (
+  <div
+    style={{
+      position: "fixed",
+      bottom: "100px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#222",
+      color: "#fff",
+      padding: "10px 16px",
+      borderRadius: "6px",
+      zIndex: 999,
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+      fontSize: "14px",
+      minWidth: "180px",
+      maxWidth: "280px",
+      textAlign: "center",
+      fontFamily: "sans-serif",
+      transition: "all 0.3s ease",
+    }}
+  >
+    <div>{toast}</div>
+
+    {/* Progress Bar */}
+    <div
+      style={{
+        marginTop: "6px",
+        height: "4px",
+        width: "100%",
+        background: "rgba(255, 255, 255, 0.2)",
+        borderRadius: "2px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          height: "100%",
+          width: "100%",
+          background: "rgba(255, 255, 255, 0.6)",
+          animation: "shrink 5s linear forwards",
+        }}
+      />
+    </div>
+
+    <style>
+      {`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}
+    </style>
+  </div>
+)}
+
     </div>
   );
 }
