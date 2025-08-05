@@ -103,7 +103,7 @@ export default function App() {
         onClick={() => setSidebarVisible(false)}
       >
         <div
-          onClick={(e) => e.stopPropagation()}
+          
           style={{
             width: "260px", // THIS IS THE WIDTH OF THE SIDEBAR
             height: "100%",
@@ -137,12 +137,12 @@ export default function App() {
             path="/"
             element={
               <>
-                <h3>
+                {/* <h3>
                   Welcome, {user.displayName}, to PixPick{" "}
                   <strong>{user.uid}</strong>
                 </h3>
-                <h4>{user.email}</h4>
-                <h3>{selected}</h3>
+                <h4>{user.email}</h4> */}
+                <h2>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
                 <BoardList user={user} selected={selected} />
               </>
