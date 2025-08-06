@@ -55,11 +55,32 @@ export default function BoardList({ user, selected }) {
   }
 };
 
-const handleDelete = (boardId) => {
-  const confirm = window.confirm("Are you sure you want to delete this board?");
-  if (confirm) {
+const handleDelete = async (boardId) => {
+  const confirmDelete = window.confirm("Are you sure you want to delete this board?");
+  if (!confirmDelete) return;
+
+  try {
     const boardRef = doc(db, "boards", boardId);
-    deleteDoc(boardRef);
+
+    // Delete all images in the board
+    const imagesRef = collection(boardRef, "images");
+    const imagesSnap = await getDocs(imagesRef);
+    const imageDeletes = imagesSnap.docs.map((docSnap) => deleteDoc(docSnap.ref));
+
+    // Delete all collaborators if the subcollection exists
+    const collabRef = collection(boardRef, "collaborators");
+    const collabSnap = await getDocs(collabRef);
+    const collabDeletes = collabSnap.docs.map((docSnap) => deleteDoc(docSnap.ref));
+
+    // Wait for all deletions to finish
+    await Promise.all([...imageDeletes, ...collabDeletes]);
+
+    // Now delete the board document itself
+    await deleteDoc(boardRef);
+    console.log("Board and its contents deleted successfully.");
+  } catch (err) {
+    console.error("Error deleting board and subcollections:", err);
+    alert("Failed to delete the board completely. Try again.");
   }
 };
 
