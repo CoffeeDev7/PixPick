@@ -167,7 +167,7 @@ export default function BoardPage({ user }) {
       const delta = touchEndX.current - touchStartX.current;
       const threshold = 50;
       if (delta > threshold) {
-        setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+         setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
       } else if (delta < -threshold) {
         setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
       }

@@ -84,107 +84,117 @@ useEffect(() => {
     <div style={{ marginTop: "1.5rem" }}>
       {boards.length === 0 && <p>No boards to show</p>}
       {boards.map((board) => (
+  <div
+    key={board.id}
+    style={{
+      position: "relative",
+      padding: "16px",
+      marginBottom: "16px",
+      borderRadius: "12px",
+      background: "#fff",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      transition: "box-shadow 0.2s ease",
+      cursor: "pointer",
+    }}
+    onClick={() => navigate(`/board/${board.id}`)}
+    onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"}
+    onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)"}
+  >
+    <div>
+      <strong style={{ fontSize: "1.1rem" }}>{board.title}</strong>
+      <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
+        {board.ownerId === user.uid
+          ? "👑 You own this board"
+          : "🤝 Shared with you"}
+      </div>
+    </div>
+
+    {/* 3-dots button */}
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        setMenuOpenFor(board.id);
+      }}
+      style={{
+        padding: "6px",
+        borderRadius: "50%",
+        cursor: "pointer",
+        transition: "background 0.2s",
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = "#eee"}
+      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        height="20"
+        viewBox="0 96 960 960"
+        width="20"
+        fill="#444"
+      >
+        <circle cx="480" cy="276" r="60" />
+        <circle cx="480" cy="576" r="60" />
+        <circle cx="480" cy="876" r="60" />
+      </svg>
+    </div>
+
+    {menuOpenFor === board.id && (
+      <div
+        ref={menuRef}
+        style={{
+          position: 'absolute',
+          top: '60px',
+          right: '16px',
+          background: '#fff',
+          border: '1px solid #ddd',
+          borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div
-          key={board.id}
+          onClick={() => {
+            setMenuOpenFor(null);
+            handleRename(board.id, board.title);
+          }}
           style={{
-            position: "relative",
-            padding: "12px",
-            marginBottom: "12px",
-            border: "1px solid #ddd",
-            borderRadius: "8px",
-            background: "#fff",
-            cursor: "pointer",
-            userSelect: "none",
+            padding: '10px 14px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          <div
-            onClick={() => navigate(`/board/${board.id}`)}
-            style={{ paddingRight: "24px" }}
-          >
-            <strong>{board.title}</strong>
-            <div style={{ fontSize: "12px", color: "#666" }}>
-              {board.ownerId === user.uid
-                ? "👑 You own this board"
-                : "🤝 Shared with you"}
-            </div>
-          </div>
-
-          {/* Three Dots Button */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent navigating
-              setMenuOpenFor(menuOpenFor === board.id ? null : board.id);
-            }}
-            style={{
-              position: "absolute",
-              top: "12px",
-              right: "12px",
-              fontSize: "20px",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            <FiMoreVertical />
-          </div>
-
-          {/* Dropdown Menu */}
-      {menuOpenFor === board.id && (
+          <MdEdit size={18} /> Rename
+        </div>
         <div
-          ref={menuRef}
-          style={{
-            position: "absolute",
-            top: "40px",
-            right: "12px",
-            background: "#fff",
-            border: "1px solid #ddd",
-            borderRadius: "6px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-            zIndex: 1000,
-            overflow: "hidden",
+          onClick={() => {
+            setMenuOpenFor(null);
+            handleDelete(board.id);
           }}
-          onClick={(e) => e.stopPropagation()}
+          style={{
+            padding: '10px 14px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            color: 'red',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
         >
-          <div
-            onClick={() => {
-              setMenuOpenFor(null);
-              handleRename(board.id, board.title);
-            }}
-            style={{
-              padding: "8px 12px",
-              fontSize: "14px",
-              cursor: "pointer",
-              borderBottom: "1px solid #eee",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <MdEdit style={{ fontSize: "18px" }} />
-            <span>Rename</span>
-          </div>
+          <FiTrash2 size={18} /> Delete
+        </div>
+      </div>
+    )}
+  </div>
+))}
 
-          <div
-            onClick={() => {
-              setMenuOpenFor(null);
-              handleDelete(board.id);
-            }}
-            style={{
-              padding: "8px 12px",
-              fontSize: "14px",
-              cursor: "pointer",
-              color: "red",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <FiTrash2 style={{ fontSize: "18px" }} />
-            <span>Delete</span>
-          </div>
-        </div>
-      )}
-        </div>
-      ))}
     </div>
   );
 }
