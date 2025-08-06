@@ -67,7 +67,7 @@ export default function App() {
           onClick={logout}
           style={{
             padding: "8px 16px",
-            backgroundColor: "#e0e0e0", // light grey
+            backgroundColor: "#f9a2a2ff", // light grey
             color: "#333",
             border: "none",
             borderRadius: "10px",

@@ -21,21 +21,11 @@ export default function CreateBoardModal({ user, onCreate }) {
   };
 
   return (
-    // <div style={{ marginTop: '1rem' }}>
-    //   <input
-    //     value={title}
-    //     onChange={(e) => setTitle(e.target.value)}
-    //     placeholder="Enter board name"
-    //     style={{
-    //       padding: '8px',
-    //       borderRadius: '6px',
-    //       border: '1px solid #ccc',
-    //       marginRight: '0.5rem'
-    //     }}
-    //   />
-    //   <button onClick={createBoard} style={{ backgroundColor: '#3debabff', borderRadius: '26px'}}>+ Create Board</button>
-    // </div>
-    <div
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        createBoard();
+      }}
       style={{
         display: "flex",
         alignItems: "center",
@@ -56,12 +46,11 @@ export default function CreateBoardModal({ user, onCreate }) {
           border: "1px solid #ccc",
           outline: "none",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-          
         }}
       />
 
       <button
-        onClick={createBoard}
+        type="submit"
         style={{
           width: "42px",
           height: "42px",
@@ -86,6 +75,6 @@ export default function CreateBoardModal({ user, onCreate }) {
       >
         +
       </button>
-    </div>
+    </form>
   );
 }
