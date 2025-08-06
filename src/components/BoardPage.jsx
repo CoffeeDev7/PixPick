@@ -58,28 +58,62 @@ export default function BoardPage({ user }) {
   }, [boardId]);
 
   const saveImageToFirestore = async (src) => {
-  const imageRef = collection(db, "boards", boardId, "images");
-  showToast("📤 Uploading image...", "info", 20000); // show for 10s max
+    const imageRef = collection(db, "boards", boardId, "images");
+    showToast(
+      <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <img
+          src="/public/eat (1).png"
+          alt="uploading"
+          style={{ width: "80px", height: "80px" }}
+        />
+        Uploading image.....
+      </span>,
+      "info",
+      20000
+    );
+    // show for 20s max
 
-  try {
-    await addDoc(imageRef, {
-      src,
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-      rating: null,
-    });
-    showToast("✅ Image uploaded", "success");
-  } catch (err) {
-    if (
-      err?.message?.includes("The value of property \"src\" is longer than")
-    ) {
-      showToast("❌ Image too large. ✅ Use 'Copy image address' instead.", "error");
-    } else {
-      console.error("Unexpected error saving image:", err);
-      showToast("❌ Failed to save image. Try again.", "error");
+    try {
+      await addDoc(imageRef, {
+        src,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        rating: null,
+      });
+      showToast("✅ Image uploaded", "success");showToast(
+        <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <img
+            src="/public/octopus.png"
+            alt="Success"
+            style={{ width: 70, height: 70 }}
+          />
+          Image uploaded !
+        </span>,
+        "success"
+      );
+
+    } catch (err) {
+      if (
+        err?.message?.includes('The value of property "src" is longer than')
+      ) {
+        showToast(
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <img
+              src="/water.png"
+              alt="Error"
+              style={{ width: 100, height: 100 }}
+            />
+            Image too large. Use "Copy image address" instead.
+          </span>,
+          "error"
+        );
+
+      } else {
+        console.error("Unexpected error saving image:", err);
+        showToast("❌ Failed to save image. Try again.", "error");
+      }
     }
-  }
-};
+  };
 
 
 
@@ -270,7 +304,7 @@ export default function BoardPage({ user }) {
       transform: "translateX(-50%)",
       background:
         toast.type === "error"
-          ? "#ff4d4f"
+          ? "#363e4fff"
           : toast.type === "success"
           ? "#4caf50"
           : "#555",
@@ -278,7 +312,7 @@ export default function BoardPage({ user }) {
       padding: "10px 16px",
       borderRadius: "6px",
       zIndex: 999,
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.95)",
       fontSize: "14px",
       minWidth: "180px",
       maxWidth: "280px",
