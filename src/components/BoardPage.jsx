@@ -18,17 +18,18 @@ export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null); // { msg: string, type: 'info' | 'error' | 'success' }
   const [modalIndex, setModalIndex] = useState(null);
 
   const pasteRef = useRef();
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 5000);
-  };
+  const showToast = (msg, type = 'info', duration = 5000) => {
+  setToast({ msg, type });
+  setTimeout(() => setToast(null), duration);
+};
+
 
   useEffect(() => {
     const q = query(
@@ -57,14 +58,30 @@ export default function BoardPage({ user }) {
   }, [boardId]);
 
   const saveImageToFirestore = async (src) => {
-    const imageRef = collection(db, "boards", boardId, "images");
+  const imageRef = collection(db, "boards", boardId, "images");
+  showToast("📤 Uploading image...", "info", 20000); // show for 10s max
+
+  try {
     await addDoc(imageRef, {
       src,
       createdBy: user.uid,
       createdAt: serverTimestamp(),
       rating: null,
     });
-  };
+    showToast("✅ Image uploaded", "success");
+  } catch (err) {
+    if (
+      err?.message?.includes("The value of property \"src\" is longer than")
+    ) {
+      showToast("❌ Image too large. ✅ Use 'Copy image address' instead.", "error");
+    } else {
+      console.error("Unexpected error saving image:", err);
+      showToast("❌ Failed to save image. Try again.", "error");
+    }
+  }
+};
+
+
 
   const handlePaste = async (event) => {
     let handled = false;
@@ -245,55 +262,67 @@ export default function BoardPage({ user }) {
       )}
 
       {toast && (
+  <div
+    style={{
+      position: "fixed",
+      bottom: "100px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background:
+        toast.type === "error"
+          ? "#ff4d4f"
+          : toast.type === "success"
+          ? "#4caf50"
+          : "#555",
+      color: "#fff",
+      padding: "10px 16px",
+      borderRadius: "6px",
+      zIndex: 999,
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+      fontSize: "14px",
+      minWidth: "180px",
+      maxWidth: "280px",
+      textAlign: "center",
+      fontFamily: "sans-serif",
+      transition: "all 0.3s ease",
+    }}
+  >
+    <div>{toast.msg}</div>
+
+    {/* Only show progress bar for info type */}
+    {toast.type === "info" && (
+      <div
+        style={{
+          marginTop: "6px",
+          height: "4px",
+          width: "100%",
+          background: "rgba(255, 255, 255, 0.2)",
+          borderRadius: "2px",
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
-            position: "fixed",
-            bottom: "100px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#222",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: "6px",
-            zIndex: 999,
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-            fontSize: "14px",
-            minWidth: "180px",
-            maxWidth: "280px",
-            textAlign: "center",
-            fontFamily: "sans-serif",
+            height: "100%",
+            width: "100%",
+            background: "rgba(255, 255, 255, 0.6)",
+            animation: "shrink 20s linear forwards",
           }}
-        >
-          <div>{toast}</div>
-          <div
-            style={{
-              marginTop: "6px",
-              height: "4px",
-              width: "100%",
-              background: "rgba(255, 255, 255, 0.2)",
-              borderRadius: "2px",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: "100%",
-                background: "rgba(255, 255, 255, 0.6)",
-                animation: "shrink 5s linear forwards",
-              }}
-            />
-          </div>
-          <style>
-            {`
-              @keyframes shrink {
-                from { width: 100%; }
-                to { width: 0%; }
-              }
-            `}
-          </style>
-        </div>
-      )}
+        />
+      </div>
+    )}
+
+    <style>
+      {`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}
+    </style>
+  </div>
+)}
+
     </div>
   );
 }
