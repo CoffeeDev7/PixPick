@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import {
   doc,
   getDoc,
+  getDocs,
   collection,
   addDoc,
   onSnapshot,
@@ -25,6 +26,38 @@ export default function BoardPage({ user }) {
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
   const [collaborators, setCollaborators] = useState([]);
+  const [collaboratorUIDs, setCollaboratorUIDs] = useState([]);
+  const [CollaboratorProfiles, setCollaboratorProfiles] = useState([]);
+
+  // fetch collaborator UIDs when the boardId changes
+useEffect(() => {
+  async function fetchCollaboratorAndOwnerUIDs() {
+    if (!boardId) return;
+
+    // 1. Get the board document to extract owner UID
+    const boardRef = doc(db, "boards", boardId);
+    const boardSnap = await getDoc(boardRef);
+    if (!boardSnap.exists()) return;
+
+    const ownerUID = boardSnap.data().owner;
+
+    // 2. Get all collaborator document IDs
+    const collaboratorsRef = collection(db, "boards", boardId, "collaborators");
+    const collaboratorsSnap = await getDocs(collaboratorsRef);
+    const collaboratorIDs = collaboratorsSnap.docs.map(doc => doc.id);
+
+    // 3. Merge and remove duplicates using Set
+    // ✅ Remove undefined using .filter(Boolean)
+    const allUIDs = Array.from(new Set([ownerUID, ...collaboratorIDs].filter(Boolean)));
+
+    // 4. Save to state
+    setCollaboratorUIDs(allUIDs);
+  }
+
+  fetchCollaboratorAndOwnerUIDs();
+}, [boardId]);
+
+
 
 useEffect(() => {
   const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
@@ -39,6 +72,26 @@ useEffect(() => {
   setToast({ msg, type });
   setTimeout(() => setToast(null), duration);
 };
+
+useEffect(() => {
+  async function fetchCollaboratorProfiles() {
+    if (!collaboratorUIDs || collaboratorUIDs.length === 0) return;
+
+    try {
+      const promises = collaboratorUIDs.map(uid => getDoc(doc(db, "users", uid)));
+      const docs = await Promise.all(promises);
+      const profiles = docs.map(d => ({ uid: d.id, ...d.data() }));
+      setCollaboratorProfiles(profiles);
+    } catch (error) {
+      console.error("Error fetching collaborator profiles:", error);
+    }
+  }
+
+  fetchCollaboratorProfiles();
+  console.log("collaboratorUIDs", collaboratorUIDs);
+
+}, [collaboratorUIDs]);
+
 
 
   useEffect(() => {
@@ -381,6 +434,15 @@ console.log("Collaborators:", collaborators);
         />
       </div>
     )}
+
+    {CollaboratorProfiles.map(profile => (
+  <img
+    key={profile.uid}
+    src={profile.photoURL}
+    alt={profile.displayName}
+    style={{ width: 32, height: 32, borderRadius: "50%", marginLeft: -8 }}
+  />
+))}
 
     <style>
       {`
