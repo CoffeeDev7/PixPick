@@ -12,3 +12,6 @@ collaborators are set thru --> same as above but differnet parameters in it![alt
         |  contain uid and the role:owner/editor
         |
         ![alt text](image-3.png)
+
+
+good color : "#1b999fff"

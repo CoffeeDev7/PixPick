@@ -1,4 +1,4 @@
-import { Link, Routes, Route, useNavigate } from 'react-router-dom';
+import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
 import CreateBoardModal from './components/CreateBoardModal';
@@ -42,10 +42,13 @@ export default function App() {
 
   if (!user) return <LoginPage login={login}/>
 
+  const location = useLocation();
+  const isBoardPage = location.pathname.startsWith("/board/");
+
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
       {/* TOP GRAY HEADER */}
-      <div
+      {!isBoardPage && ( <div
         style={{
           backgroundColor: "#42a5f5",
           padding: "12px 0",
@@ -106,7 +109,7 @@ export default function App() {
         >
           Logout
         </button>
-      </div>
+      </div>)}
 
       {/* Sidebar Modal Overlay */}
       <div
@@ -152,7 +155,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ padding: "2rem", marginTop: "60px" }}>
+      <div style={{  padding: '0.6rem', marginTop: isBoardPage ? "0px" : "60px", transition: "margin-top 0.3s ease" }}>
         <Routes>
           <Route
             path="/"

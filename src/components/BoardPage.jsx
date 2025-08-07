@@ -268,7 +268,7 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
 }, [boardId, collaboratorProfiles]);
 
   return (
-    <div style={{ marginTop: "5px" }}>
+    <div style={{ marginTop: "0px"}}>
       <h2
         style={{
           display: "flex",
