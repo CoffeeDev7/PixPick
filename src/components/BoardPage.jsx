@@ -89,6 +89,7 @@ useEffect(() => {
 
   fetchCollaboratorProfiles();
   console.log("collaboratorUIDs", collaboratorUIDs);
+  console.log("collaborators:", collaborators);
 
 }, [collaboratorUIDs]);
 
@@ -264,38 +265,51 @@ useEffect(() => {
 
 useEffect(() => {
 console.log("collaboratorprofiels:", collaboratorProfiles);
-}, [collaborators]);
+}, [boardId, collaboratorProfiles]);
 
   return (
     <div style={{ marginTop: "5px" }}>
-      <h2 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", userSelect: "none" }}>
-         {boardTitle}{" "} 
-        <span style={{ fontSize: "0.9rem", color: "#888", }}>{images.length} {images.length === 1 ? "pick" : "picks"}</span>
+      <h2
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          userSelect: "none",
+        }}
+      >
+        {boardTitle}{" "}
+        <span style={{ fontSize: "0.9rem", color: "#888" }}>
+          {images.length} {images.length === 1 ? "pick" : "picks"}
+        </span>
       </h2>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-  {collaborators.map((c, i) => (
-    <div key={c.id}
-      title={`${c.role} (${c.id})`}
-      style={{
-        width: '32px',
-        height: '32px',
-        backgroundColor: '#ccc',
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        color: '#fff',
-        border: '2px solid white',
-        transform: `translateX(-${i * 10}px)`,
-        zIndex: collaborators.length - i,
-      }}>
-      {c.id.charAt(0).toUpperCase()}
-    </div>
-  ))}
-</div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          marginBottom: "12px",
+          position: "relative", // ensure overlapping works well
+        }}
+      >
+        {collaboratorProfiles.map((profile, i) => (
+          <img
+            key={profile.uid}
+            src={profile.photoURL}
+            alt={profile.displayName}
+            title={`${profile.displayName} (${profile.uid})`}
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              border: "2px solid white",
+              objectFit: "cover",
+              transform: `translateX(-${i * 10}px)`,
+              zIndex: collaboratorProfiles.length - i,
+            }}
+          />
+        ))}
+      </div>
 
       <textarea
         ref={pasteRef}
@@ -387,79 +401,81 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
       )}
 
       {toast && (
-  <div
-    style={{
-      position: "fixed",
-      bottom: "100px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      background:
-        toast.type === "error"
-          ? "#363e4fff"
-          : toast.type === "success"
-          ? "#4caf50"
-          : "#555",
-      color: "#fff",
-      padding: "10px 16px",
-      borderRadius: "6px",
-      zIndex: 999,
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.95)",
-      fontSize: "14px",
-      minWidth: "180px",
-      maxWidth: "280px",
-      textAlign: "center",
-      fontFamily: "sans-serif",
-      transition: "all 0.3s ease",
-    }}
-  >
-    <div>{toast.msg}</div>
-
-    {/* Only show progress bar for info type */}
-    {toast.type === "info" && (
-      <div
-        style={{
-          marginTop: "6px",
-          height: "4px",
-          width: "100%",
-          background: "rgba(255, 255, 255, 0.2)",
-          borderRadius: "2px",
-          overflow: "hidden",
-        }}
-      >
         <div
           style={{
-            height: "100%",
-            width: "100%",
-            background: "rgba(255, 255, 255, 0.6)",
-            animation: "shrink 20s linear forwards",
+            position: "fixed",
+            bottom: "100px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background:
+              toast.type === "error"
+                ? "#363e4fff"
+                : toast.type === "success"
+                ? "#4caf50"
+                : "#555",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: "6px",
+            zIndex: 999,
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.95)",
+            fontSize: "14px",
+            minWidth: "180px",
+            maxWidth: "280px",
+            textAlign: "center",
+            fontFamily: "sans-serif",
+            transition: "all 0.3s ease",
           }}
-        />
-      </div>
-    )}
-    {console.log("CollaboratorProfiles:", collaboratorProfiles)}
+        >
+          <div>{toast.msg}</div>
 
-    {collaboratorProfiles.map(profile => (
-  <img
-    key={profile.uid}
-    src={profile.photoURL}
-    alt={profile.displayName}
-    style={{ width: 32, height: 32, borderRadius: "50%", marginLeft: -8 }}
-  />
-))
-}
+          {/* Only show progress bar for info type */}
+          {toast.type === "info" && (
+            <div
+              style={{
+                marginTop: "6px",
+                height: "4px",
+                width: "100%",
+                background: "rgba(255, 255, 255, 0.2)",
+                borderRadius: "2px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: "100%",
+                  background: "rgba(255, 255, 255, 0.6)",
+                  animation: "shrink 20s linear forwards",
+                }}
+              />
+            </div>
+          )}
+          {console.log("CollaboratorProfiles:", collaboratorProfiles)}
 
+          {collaboratorProfiles.map((profile) => (
+            <img
+              key={profile.uid}
+              src={profile.photoURL}
+              alt={profile.displayName}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                marginLeft: -8,
+              }}
+            />
+          ))}
 
-    <style>
-      {`
+          <style>
+            {`
         @keyframes shrink {
           from { width: 100%; }
           to { width: 0%; }
         }
       `}
-    </style>
-  </div>
-)}
-
+          </style>
+        </div>
+      )}
     </div>
   );
 }
