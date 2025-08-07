@@ -24,6 +24,16 @@ export default function BoardPage({ user }) {
   const pasteRef = useRef();
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
+  const [collaborators, setCollaborators] = useState([]);
+
+useEffect(() => {
+  const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
+  const unsubscribe = onSnapshot(collaboratorsRef, (snapshot) => {
+    setCollaborators(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  });
+  return () => unsubscribe();
+}, [boardId]);
+
 
   const showToast = (msg, type = 'info', duration = 5000) => {
   setToast({ msg, type });
@@ -199,12 +209,38 @@ export default function BoardPage({ user }) {
   return () => window.removeEventListener("keydown", handleKeyDown);
 }, [modalIndex, images.length]);
 
+console.log("Collaborators:", collaborators);
+
   return (
     <div style={{ marginTop: "5px" }}>
       <h2 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", userSelect: "none" }}>
          {boardTitle}{" "} 
         <span style={{ fontSize: "0.9rem", color: "#888", }}>{images.length} {images.length === 1 ? "pick" : "picks"}</span>
       </h2>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+  {collaborators.map((c, i) => (
+    <div key={c.id}
+      title={`${c.role} (${c.id})`}
+      style={{
+        width: '32px',
+        height: '32px',
+        backgroundColor: '#ccc',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        color: '#fff',
+        border: '2px solid white',
+        transform: `translateX(-${i * 10}px)`,
+        zIndex: collaborators.length - i,
+      }}>
+      {c.id.charAt(0).toUpperCase()}
+    </div>
+  ))}
+</div>
 
       <textarea
         ref={pasteRef}

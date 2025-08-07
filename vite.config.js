@@ -7,7 +7,7 @@ export default defineConfig({
   // Blocked request. This host ("1d705853c0fa.ngrok-free.app") is not allowed.
 //To allow this host, add "1d705853c0fa.ngrok-free.app" to `server.allowedHosts` in vite.config.js.
   server: {
-    allowedHosts: ['1d705853c0fa.ngrok-free.app','43020fc36ad2.ngrok-free.app']
+    allowedHosts: ['1d705853c0fa.ngrok-free.app','2724341e5551.ngrok-free.app']
   },
   resolve: {
     alias: {
