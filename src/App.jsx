@@ -7,6 +7,8 @@ import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import LoginPage from './components/LoginPage';
+import { doc, setDoc, collection, onSnapshot } from 'firebase/firestore';
+import { db } from './firebase';
 
 
 export default function App() {
@@ -15,8 +17,18 @@ export default function App() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
+  async function login() {
+  const result = await signInWithPopup(auth, provider);
+  const user = result.user;
 
-  const login = () => signInWithPopup(auth, provider);
+  const userRef = doc(db, "users", user.uid);
+  await setDoc(userRef, {
+    displayName: user.displayName,
+    email: user.email,
+    photoURL: user.photoURL
+  }, { merge: true }); // merge:true so we don't overwrite if already exists
+}
+  //const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
   if (!user) return <LoginPage login={login}/>
