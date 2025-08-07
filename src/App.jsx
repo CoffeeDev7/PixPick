@@ -157,15 +157,9 @@ export default function App() {
       {/* Main Content Area */}
       <div style={{  padding: '0.6rem', marginTop: isBoardPage ? "0px" : "60px", transition: "margin-top 0.3s ease" }}>
         <Routes>
-          <Route
-            path="/"
+          <Route path="/"
             element={
               <>
-                {/* <h3>
-                  Welcome, {user.displayName}, to PixPick{" "}
-                  <strong>{user.uid}</strong>
-                </h3>
-                <h4>{user.email}</h4> */}
                 <h2>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
                 <BoardList user={user} selected={selected} />
