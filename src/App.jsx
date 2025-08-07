@@ -29,7 +29,16 @@ export default function App() {
   }, { merge: true }); // merge:true so we don't overwrite if already exists
 }
   //const login = () => signInWithPopup(auth, provider);
-  const logout = () => signOut(auth);
+  const navigate = useNavigate();
+  //also come out of board when logged out
+  const logout = async () => {
+  try {
+    await signOut(auth);
+    navigate("/");
+  } catch (error) {
+    console.error("Error signing out:", error);
+  }
+};
 
   if (!user) return <LoginPage login={login}/>
 

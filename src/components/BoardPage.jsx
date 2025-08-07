@@ -1,5 +1,5 @@
 // src/components/BoardPage.jsx
-import { useEffect, useRef, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../firebase';
 import {
@@ -27,7 +27,7 @@ export default function BoardPage({ user }) {
   const touchEndX = useRef(null);
   const [collaborators, setCollaborators] = useState([]);
   const [collaboratorUIDs, setCollaboratorUIDs] = useState([]);
-  const [CollaboratorProfiles, setCollaboratorProfiles] = useState([]);
+  const [collaboratorProfiles, setcollaboratorProfiles] = useState([]);
 
   // fetch collaborator UIDs when the boardId changes
 useEffect(() => {
@@ -81,7 +81,7 @@ useEffect(() => {
       const promises = collaboratorUIDs.map(uid => getDoc(doc(db, "users", uid)));
       const docs = await Promise.all(promises);
       const profiles = docs.map(d => ({ uid: d.id, ...d.data() }));
-      setCollaboratorProfiles(profiles);
+      setcollaboratorProfiles(profiles);
     } catch (error) {
       console.error("Error fetching collaborator profiles:", error);
     }
@@ -262,7 +262,9 @@ useEffect(() => {
   return () => window.removeEventListener("keydown", handleKeyDown);
 }, [modalIndex, images.length]);
 
-console.log("Collaborators:", collaborators);
+useEffect(() => {
+console.log("collaboratorprofiels:", collaboratorProfiles);
+}, [collaborators]);
 
   return (
     <div style={{ marginTop: "5px" }}>
@@ -434,15 +436,18 @@ console.log("Collaborators:", collaborators);
         />
       </div>
     )}
+    {console.log("CollaboratorProfiles:", collaboratorProfiles)}
 
-    {CollaboratorProfiles.map(profile => (
+    {collaboratorProfiles.map(profile => (
   <img
     key={profile.uid}
     src={profile.photoURL}
     alt={profile.displayName}
     style={{ width: 32, height: 32, borderRadius: "50%", marginLeft: -8 }}
   />
-))}
+))
+}
+
 
     <style>
       {`
