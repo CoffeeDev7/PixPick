@@ -1,5 +1,5 @@
-import { useEffect, useState,useRef } from 'react';
-import { collection, query, where, getDocs, onSnapshot, orderBy } from 'firebase/firestore';
+import { useEffect, useState,useRef, use } from 'react';
+import { collection, query, where, getDocs, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,8 @@ import { MdEdit } from 'react-icons/md';
 export default function BoardList({ user, selected }) {
   const [boards, setBoards] = useState([]);
   const [menuOpenFor, setMenuOpenFor] = useState(null);
+  // 1. Initialize state as an empty object
+  const [latestboardimages, setlatestboardimages] = useState({});
 
   const navigate = useNavigate();
 
@@ -44,6 +46,70 @@ export default function BoardList({ user, selected }) {
     fetchBoards();
   }, [user, selected]);
 
+  // Fetch latest 3 images for each board
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchBoardsWithImages = async () => {
+      let boardsQuery;
+
+      if (selected === "My Boards") {
+        boardsQuery = query(
+          collection(db, "boards"),
+          where("ownerId", "==", user.uid),
+          orderBy("createdAt", "desc")
+        );
+      } else if (selected === "Shared with Me") {
+        boardsQuery = query(
+          collection(db, "boards"),
+          where("sharedWith", "array-contains", user.uid),
+          orderBy("createdAt", "desc")
+        );
+      } else {
+        boardsQuery = query(collection(db, "boards"), orderBy("createdAt", "desc"));
+      }
+
+      const boardsSnap = await getDocs(boardsQuery);
+
+      // 2. Use a different structure to build the object
+      const newLatestImages = {};
+
+      const boardsWithImages = await Promise.all(
+        boardsSnap.docs.map(async (docSnap) => {
+          const boardData = { id: docSnap.id, ...docSnap.data() };
+          const boardId = docSnap.id;
+
+          // Fetch latest 3 images from subcollection
+          const imagesRef = collection(db, "boards", docSnap.id, "images");
+          const imageQuery = query(imagesRef, orderBy("createdAt", "desc"), limit(3));
+          const imageSnap = await getDocs(imageQuery);
+          console.log(`Fetched ${imageSnap.size} images for board ${docSnap.id} and imageSnap is:}`, imageSnap);
+          imageSnap.forEach(docSnap => {
+            console.log("Image doc:", docSnap.id, docSnap.data());
+          });
+
+          const latestImages = imageSnap.docs.map((imgDoc) => imgDoc.data().src || "");
+
+        // 3. Populate the new object with the boardId as key
+          newLatestImages[boardId] = latestImages;
+          console.log(`Latest images for board ${docSnap.id}:`, latestImages);
+
+          return { ...boardData, latestImages };
+        })
+      );
+
+      // 4. Update the state with the new object
+      setlatestboardimages(newLatestImages);
+      console.log("Latest images by board ID:", newLatestImages);
+    
+      console.log("Boards with latest images:", boardsWithImages);
+    };
+    
+    fetchBoardsWithImages();
+  }, [user, selected]);
+
+
+ 
   const handleRename = (boardId, currentTitle) => {
   const newTitle = prompt("Enter new title", currentTitle);
   if (newTitle && newTitle.trim() !== "") {
@@ -135,6 +201,25 @@ useEffect(() => {
                 ? "👑 You own this board"
                 : "🤝 Shared with you"}
             </div>
+          </div>
+          
+          {/* Latest images */}
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            {latestboardimages[board.id] && (
+              latestboardimages[board.id].map((item, idx) => (
+                <img
+                  key={idx}
+                  src={item || fallbackImage}
+                  alt={`Preview ${idx + 1}`}
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                  }}
+                />
+              ))
+            ) }
           </div>
 
           {/* 3-dots button */}

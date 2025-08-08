@@ -15,6 +15,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [selected, setSelected] = useState("My Boards");
   const [sidebarVisible, setSidebarVisible] = useState(false);
+   const location = useLocation();
+  const isBoardPage = location.pathname.startsWith("/board/");
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
   async function login() {
@@ -42,8 +44,7 @@ export default function App() {
 
   if (!user) return <LoginPage login={login}/>
 
-  const location = useLocation();
-  const isBoardPage = location.pathname.startsWith("/board/");
+ 
 
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
