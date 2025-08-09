@@ -15,3 +15,8 @@ collaborators are set thru --> same as above but differnet parameters in it![alt
 
 
 good color : "#1b999fff"
+
+FOR WIDE, COMPACT, PLAIN
+
+boardgrid is the main
+it contains boardcover (main image + 2 preview imgs) and board info ( Mulan, You own this board)
