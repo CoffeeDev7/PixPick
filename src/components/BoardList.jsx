@@ -15,6 +15,7 @@ import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { FiTrash2 } from "react-icons/fi";
 import { MdEdit } from "react-icons/md";
+import { MdViewModule, MdViewDay, MdTextFields } from "react-icons/md"; // refined icons
 
 export default function BoardList({ user, selected }) {
   const [boards, setBoards] = useState([]);
@@ -193,17 +194,16 @@ export default function BoardList({ user, selected }) {
         }
         .board-grid {
           display: grid;
-          gap: var(--gap); /* default gap for plain mode */
+          gap: var(--gap);
         }
-
         .board-item {
           background: white;
           border-radius: var(--card-radius);
           overflow: hidden;
           box-shadow: 0 6px 18px rgba(12, 12, 16, 0.05);
           cursor: pointer;
+          position: relative;
         }
-        
         .board-item:hover {
           transform: translateY(-6px);
           box-shadow: 0 14px 30px rgba(12, 12, 16, 0.08);
@@ -226,17 +226,13 @@ export default function BoardList({ user, selected }) {
           object-fit: cover;
           object-position: top center;
         }
-
-        /* Wide mode: each preview image is half the column height */
         .wide .preview-images img {
           width: 100%;
-          height: calc(50% - (6px / 2)); /* 6px gap accounted for */
+          height: calc(50% - (6px / 2));
           object-fit: cover;
           object-position: top center;
           display: block;
         }
-
-        /* Compact mode: previews fill their grid cells completely */
         .compact .preview-images img {
           width: 100%;
           height: 100%;
@@ -244,56 +240,40 @@ export default function BoardList({ user, selected }) {
           object-position: top center;
           display: block;
         }
-
-        /* Compact layout */
         .board-grid.compact {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 8px;
-          /* debug background:  /* background: #9a0b7bff; */ 
         }
-          
         .compact .board-cover {
           display: grid;
-          height: 150px; /* or whatever height you want */
-          grid-template-columns: 1.8fr 1fr; /* main image + previews side-by-side */
-          /* debug background:  /* background: #7d9a0bff; */ 
+          height: 150px;
+          grid-template-columns: 1.8fr 1fr;
           gap:2px;
           padding: 2px;
         }
-
         .compact .preview-images {
           display: grid;
           grid-template-rows: repeat(2, 1fr);
           gap: 1px;
-          /* debug background:  /* background: #6d1e1eff; */ 
         }
-
-        /* Wide layout */
         .board-grid.wide {
           display: grid;
           grid-template-columns: 1fr;
           gap: var(--gap);
-          /* debug background:  /* background: #1c1ca4ff; */ 
         }
         .wide .board-cover {
           height: 180px;
           grid-template-columns: 1.5fr 1fr;
-          /* debug background:  /* background: #1ca48dff; */ 
         }
         .wide .preview-images {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          /* debug background:  /* background: #1a6d93ff; */ 
         }
-
-        /* Plain mode: hide previews and show only the title/meta */
         .board-grid.plain .board-cover {
           display: none;
-          
         }
-
         .board-info {
           padding: 10px 12px 14px;
         }
@@ -310,50 +290,119 @@ export default function BoardList({ user, selected }) {
           color: #7b7b84;
           font-size: 13px;
         }
+
+        /* Clean rounded icon-only segmented control (pill) */
+        .segmented-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ffffff;
+          border-radius: 999px;
+          padding: 6px;
+          border: 1px solid rgba(16,16,20,0.08);
+          box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+        }
+
+        .seg-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 999px;
+          cursor: pointer;
+          transition: all 160ms ease;
+          user-select: none;
+          position: relative;
+          color: #5b5b66;
+          background: transparent;
+          border: none;
+          outline: none;
+        }
+
+        .seg-btn:hover {
+          transform: translateY(-2px);
+          background: rgba(16,16,20,0.03);
+        }
+
+        .seg-btn:focus {
+          box-shadow: 0 0 0 4px rgba(34, 100, 255, 0.08);
+        }
+
+        .seg-btn.active {
+          background: linear-gradient(180deg, rgba(16,16,20,0.04), rgba(16,16,20,0.02));
+          color: #111;
+          box-shadow: 0 6px 14px rgba(16,16,20,0.06);
+          transform: translateY(-1px);
+        }
+
+        /* small label under control (optional) */
+        .seg-labels {
+          display: inline-flex;
+          gap: 10px;
+          margin-left: 10px;
+          align-items: center;
+          color: #6b6b75;
+          font-size: 13px;
+        }
+
+        /* visually hidden text for a11y (if you want) */
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0,0,0,0);
+          white-space: nowrap;
+          border: 0;
+        }
       `}</style>
 
-      {/* Toggle Button */}
-      <div style={{ marginBottom: "1rem" }}>
-        <button
-          onClick={() => setViewMode("wide")}
-          style={{
-            marginRight: "8px",
-            background: viewMode === "wide" ? "#ddd" : "#fff",
-            padding: "6px 10px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            cursor: "pointer",
-          }}
-        >
-          Wide
-        </button>
-        <button
-          onClick={() => setViewMode("compact")}
-          style={{
-            marginRight: "8px",
-            background: viewMode === "compact" ? "#ddd" : "#fff",
-            padding: "6px 10px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            cursor: "pointer",
-          }}
-        >
-          Compact
-        </button>
+      {/* Rounded icon-only segmented control */}
+      <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center" }}>
+        <div className="segmented-pill" role="tablist" aria-label="View mode">
+          <button
+            className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
+            onClick={() => setViewMode("wide")}
+            title="Wide view"
+            aria-pressed={viewMode === "wide"}
+            aria-label="Wide view"
+          >
+            <MdViewModule size={18} />
+            <span className="sr-only">Wide</span>
+          </button>
 
-        {/* Plain option (shows just the title/meta) */}
-        <button
-          onClick={() => setViewMode("plain")}
-          style={{
-            background: viewMode === "plain" ? "#ddd" : "#fff",
-            padding: "6px 10px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            cursor: "pointer",
-          }}
-        >
-          Plain
-        </button>
+          <button
+            className={`seg-btn ${viewMode === "compact" ? "active" : ""}`}
+            onClick={() => setViewMode("compact")}
+            title="Compact view"
+            aria-pressed={viewMode === "compact"}
+            aria-label="Compact view"
+          >
+            <MdViewDay size={18} />
+            <span className="sr-only">Compact</span>
+          </button>
+
+          <button
+            className={`seg-btn ${viewMode === "plain" ? "active" : ""}`}
+            onClick={() => setViewMode("plain")}
+            title="Plain list"
+            aria-pressed={viewMode === "plain"}
+            aria-label="Plain list"
+          >
+            <MdTextFields size={18} />
+            <span className="sr-only">Plain</span>
+          </button>
+        </div>
+
+        {/* optional descriptive labels - remove if you prefer purely icon-only */}
+        <div className="seg-labels" aria-hidden="true">
+          <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>
+          <div style={{ opacity: viewMode === "compact" ? 1 : 0.5 }}>Compact</div>
+          <div style={{ opacity: viewMode === "plain" ? 1 : 0.5 }}>Plain</div>
+        </div>
       </div>
 
       {boards.length === 0 && <p>No boards to show</p>}
@@ -370,17 +419,26 @@ export default function BoardList({ user, selected }) {
               <div className="board-cover">
                 <div className="main-image">
                   <img
-                    src={imgs[0] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
+                    src={
+                      imgs[0] ||
+                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                    }
                     alt=""
                   />
                 </div>
                 <div className="preview-images">
                   <img
-                    src={imgs[1] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
+                    src={
+                      imgs[1] ||
+                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                    }
                     alt=""
                   />
                   <img
-                    src={imgs[2] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
+                    src={
+                      imgs[2] ||
+                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                    }
                     alt=""
                   />
                 </div>
