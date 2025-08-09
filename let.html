@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Boards tall-friendly</title>
+<style>
+  :root {
+    --max-width: 640px;
+    --gap: 14px;
+    --card-radius: 12px;
+    --card-height: 280px; /* increased height for tall container */
+  }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: #f7f7f8;
+    padding: 1px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .container {
+    width: 100%;
+    max-width: var(--max-width);
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--gap);
+  }
+
+  .board-item {
+    background: white;
+    border-radius: var(--card-radius);
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(12, 12, 16, 0.05);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    cursor: pointer;
+  }
+
+  .board-item:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 14px 30px rgba(12, 12, 16, 0.08);
+  }
+
+  /* COVER LAYOUT: tall previews */
+  .board-cover {
+    height: var(--card-height);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 8px;
+    box-sizing: border-box;
+    align-items: stretch;
+  }
+
+  .main-image,
+  .preview-images {
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ddd;
+  }
+
+  .preview-images {
+    display: grid;
+    grid-template-rows: repeat(2, 1fr); /* Two rows for two previews */
+    gap: 6px;
+    height: 100%;
+  }
+
+  .preview-images img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+  }
+
+  .main-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+  }
+
+  .board-info {
+    padding: 10px 12px 14px;
+  }
+
+  .board-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .board-meta {
+    margin: 6px 0 0;
+    color: #7b7b84;
+    font-size: 13px;
+  }
+
+  @media (max-width: 420px) {
+    .board-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .board-cover{
+        grid-template-columns: 1.8fr 1fr; /* Single column for smaller screens */
+     /* Two rows for main and previews */
+    }
+    :root {
+      --card-height: 150px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="board-grid">
+      <article class="board-item">
+        <div class="board-cover">
+          <div class="main-image">
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1OFEf1sF2ShbchbZIqce63ltNbZC3wqpoyA&s" alt="Tall" onerror="this.onerror=null;this.src='https://placehold.co/800x1200/ccc/fff?text=Main+Image';"/>
+          </div>
+          <div class="preview-images">
+            <img src="https://0.soompi.io/wp-content/uploads/2025/03/10005253/park-shin-hye.jpg" alt="Preview 1" onerror="this.onerror=null;this.src='https://placehold.co/600x1200/ddd/fff?text=Prev1';"/>
+            <img src="https://filmfare.wwmindia.com/content/2025/feb/barbiehsu11738654770.jpg" alt="Preview 2" onerror="this.onerror=null;this.src='https://placehold.co/600x1200/eee/fff?text=Prev2';"/>
+          </div>
+        </div>
+        <div class="board-info">
+          <h3 class="board-title">Tall images balanced</h3>
+          <div class="board-meta">12 Pins • 2d</div>
+        </div>
+      </article>
+
+      <article class="board-item">
+        <div class="board-cover">
+          <div class="main-image">
+            <img src="https://filmfare.wwmindia.com/content/2025/feb/barbiehsu11738654770.jpg" alt="Wide" onerror="this.onerror=null;this.src='https://placehold.co/1200x800/ccc/fff?text=Main+Image';"/>
+          </div>
+          <div class="preview-images">
+            <img src="https://i.mydramalist.com/Q3Nz7_5c.jpg" alt="Tall Preview 1" onerror="this.onerror=null;this.src='https://placehold.co/600x1200/ddd/fff?text=Tall+Prev1';"/>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/ParkShinHye09122018.jpg/640px-ParkShinHye09122018.jpg" alt="Tall Preview 2" />
+          </div>
+        </div>
+        <div class="board-info">
+          <h3 class="board-title">Wide images still fine</h3>
+          <div class="board-meta">13 Pins • 1d</div>
+        </div>
+      </article>
+    </div>
+  </div>
+</body>
+</html>
