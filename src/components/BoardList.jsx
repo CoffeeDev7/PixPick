@@ -370,17 +370,17 @@ export default function BoardList({ user, selected }) {
               <div className="board-cover">
                 <div className="main-image">
                   <img
-                    src={imgs[0] || "https://via.placeholder.com/300"}
+                    src={imgs[0] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
                     alt=""
                   />
                 </div>
                 <div className="preview-images">
                   <img
-                    src={imgs[1] || "https://via.placeholder.com/300"}
+                    src={imgs[1] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
                     alt=""
                   />
                   <img
-                    src={imgs[2] || "https://via.placeholder.com/300"}
+                    src={imgs[2] || "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"}
                     alt=""
                   />
                 </div>

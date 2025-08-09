@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { db } from "../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase"; // adjust path if needed
 
 export default function CreateBoardModal({ user, onCreate }) {
   const [title, setTitle] = useState("");
@@ -8,15 +8,31 @@ export default function CreateBoardModal({ user, onCreate }) {
 
   const createBoard = async () => {
     if (!title.trim()) return;
-    await addDoc(collection(db, "boards"), {
-      title,
-      ownerId: user.uid,
-      sharedWith: [],
-      createdAt: serverTimestamp(),
-    });
-    setTitle("");
-    setIsOpen(false);
-    onCreate();
+
+    try {
+      // Create the board
+      const boardRef = await addDoc(collection(db, "boards"), {
+        title,
+        ownerId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+
+      // Add creator as collaborator
+      const collabRef = doc(db, "boards", boardRef.id, "collaborators", user.uid);
+      await setDoc(collabRef, {
+        id: user.uid,
+        role: "owner",
+        boardId: boardRef.id,
+        boardTitle: title,
+        ownerId: user.uid,
+      });
+
+      setTitle("");
+      setIsOpen(false);
+      onCreate();
+    } catch (error) {
+      console.error("Error creating board:", error);
+    }
   };
 
   return (
@@ -55,19 +71,19 @@ export default function CreateBoardModal({ user, onCreate }) {
       {isOpen && (
         <div
           style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          background: "rgba(0,0,0,0.3)",
-          display: "flex",
-          alignItems: "flex-start", // ← instead of center
-          justifyContent: "center",
-          paddingTop: "15vh",       // space from top
-          overflowY: "auto",        // allow scroll if keyboard pushes
-          zIndex: 999,
-        }}
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "flex-start", // ← instead of center
+            justifyContent: "center",
+            paddingTop: "15vh",       // space from top
+            overflowY: "auto",        // allow scroll if keyboard pushes
+            zIndex: 999,
+          }}
           onClick={() => setIsOpen(false)}
         >
           <div

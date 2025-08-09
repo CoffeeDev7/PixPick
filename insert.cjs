@@ -1,59 +1,53 @@
+// insert.cjs
 const admin = require("firebase-admin");
-const { getFirestore, Timestamp } = require("firebase-admin/firestore");
+const fs = require("fs");
 
-// Initialize Admin SDK
+const serviceAccount = JSON.parse(fs.readFileSync("./pixpick-588e4-firebase-adminsdk-fbsvc-a90b5e1e9d.json"));
+
 admin.initializeApp({
-  credential: admin.credential.cert(require("./secure-key.json"))
+  credential: admin.credential.cert(serviceAccount),
 });
 
-const db = getFirestore();
+const db = admin.firestore();
 
-const usersToInsert = [
-  {
-    uid: "KYzq6q8TFIfosSEw81NeLeliFrB2",
-    email: "kssubash1402@gmail.com",
-    createdAt: "2025-08-06"
-  },
-  {
-    uid: "98pzx0xmL4eTx9cxKq6XEbqZApB2",
-    email: "anybodycandance787@gmail.com",
-    createdAt: "2025-08-05"
-  },
-  {
-    uid: "t3McPNYBGFRoPm7K9m2uNpPRaSM2",
-    email: "124004423@sastra.ac.in",
-    createdAt: "2025-08-05"
-  },
-  {
-    uid: "2nnEP9YsGxQHqRoHv05RrDUkTr93",
-    email: "satyakarthik2020@gmail.com",
-    createdAt: "2025-08-03"
-  },
-  {
-    uid: "Fq82YVljwbMw5xAtInOlZdWzh4o1",
-    email: "coffeescripted@gmail.com",
-    createdAt: "2025-08-03"
-  }
-];
+async function migrateCollaborators() {
+  const boardsSnap = await db.collection("boards").get();
 
-(async () => {
-  for (const user of usersToInsert) {
-    const userRef = db.collection("users").doc(user.uid);
-    const snapshot = await userRef.get();
+  for (const boardDoc of boardsSnap.docs) {
+    const boardData = boardDoc.data();
+    const collabsSnap = await db
+      .collection("boards")
+      .doc(boardDoc.id)
+      .collection("collaborators")
+      .get();
 
-    if (snapshot.exists) {
-      console.log(`User ${user.uid} already exists, skipping...`);
-      continue;
+    for (const collabDoc of collabsSnap.docs) {
+      const collabData = collabDoc.data();
+      let updates = {};
+
+      // add missing boardId
+      if (!("boardId" in collabData) || !collabData.boardId) {
+        updates.boardId = boardDoc.id;
+      }
+
+      if (!collabData.createdAt) {
+        updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+      if (!collabData.boardTitle) {
+        updates.boardTitle = boardData.title || "";
+      }
+      if (!collabData.ownerId) {
+        updates.ownerId = boardData.ownerId || "";
+      }
+
+      if (Object.keys(updates).length) {
+        console.log(`Updating collab in board ${boardDoc.id}:`, updates);
+        await collabDoc.ref.update(updates);
+      }
     }
-
-    await userRef.set({
-      email: user.email,
-      createdAt: Timestamp.fromDate(new Date(user.createdAt)),
-      updatedAt: Timestamp.now()
-    });
-
-    console.log(`Inserted user: ${user.uid}`);
   }
 
-  console.log("✅ All users processed.");
-})();
+  console.log("Migration complete!");
+}
+
+migrateCollaborators();
