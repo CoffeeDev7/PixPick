@@ -1,12 +1,10 @@
-import { useState } from 'react';
-import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-
-import { query, where, getDocs } from 'firebase/firestore';
-
+import { useState } from "react";
+import { db } from "../firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function CreateBoardModal({ user, onCreate }) {
   const [title, setTitle] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
 
   const createBoard = async () => {
     if (!title.trim()) return;
@@ -17,54 +15,31 @@ export default function CreateBoardModal({ user, onCreate }) {
       createdAt: serverTimestamp(),
     });
     setTitle("");
-    onCreate(); // signal parent to reload boards
+    setIsOpen(false);
+    onCreate();
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        createBoard();
-      }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        margin: "16px 0",
-      }}
-    >
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="New board name"
-        style={{
-          flex: 1,
-          padding: "12px 12px",
-          fontSize: "16px",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-          outline: "none",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-        }}
-      />
-
+    <>
+      {/* "+" button aligned next to title */}
       <button
-        type="submit"
+        onClick={() => setIsOpen(true)}
         style={{
-          width: "42px",
-          height: "42px",
-          borderRadius: "8px",
+          marginLeft: "8px",
+          width: "34px",
+          height: "34px",
+          borderRadius: "6px",
           backgroundColor: "#f1f3f4",
           border: "none",
-          fontSize: "24px",
+          fontSize: "22px",
           fontWeight: "bold",
           cursor: "pointer",
-          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.2)",
-          display: "flex",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
+          display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           transition: "background 0.2s ease",
+          verticalAlign: "middle",
         }}
         onMouseEnter={(e) =>
           (e.currentTarget.style.backgroundColor = "#e0e0e0")
@@ -75,6 +50,86 @@ export default function CreateBoardModal({ user, onCreate }) {
       >
         +
       </button>
-    </form>
+
+      {/* Modal */}
+      {isOpen && (
+        <div
+          style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          background: "rgba(0,0,0,0.3)",
+          display: "flex",
+          alignItems: "flex-start", // ← instead of center
+          justifyContent: "center",
+          paddingTop: "15vh",       // space from top
+          overflowY: "auto",        // allow scroll if keyboard pushes
+          zIndex: 999,
+        }}
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "20px",
+              borderRadius: "8px",
+              width: "90%",
+              maxWidth: "400px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: "12px" }}>Create New Board</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                createBoard();
+              }}
+              style={{ display: "flex", gap: "12px" }}
+            >
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Board name"
+                autoFocus
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  fontSize: "16px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                  outline: "none",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  padding: "0 16px",
+                  borderRadius: "8px",
+                  backgroundColor: "#4cafef",
+                  border: "none",
+                  color: "white",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                  transition: "background 0.2s ease",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#3b8dd9")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#4cafef")
+                }
+              >
+                Create
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

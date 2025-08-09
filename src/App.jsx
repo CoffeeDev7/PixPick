@@ -49,68 +49,70 @@ export default function App() {
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
       {/* TOP GRAY HEADER */}
-      {!isBoardPage && ( <div
-        style={{
-          backgroundColor: "#42a5f5",
-          padding: "12px 0",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          position: "fixed",
-          left: 0,
-          right: 0,
-          top: 0,
-          height: "60px",
-          zIndex: 10,
-        }}
-      >
-        <button
-          onClick={() => setSidebarVisible(true)}
+      {!isBoardPage && (
+        <div
           style={{
-            fontSize: "24px",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            marginLeft: "-12px",
+            backgroundColor: "#42a5f5",
+            padding: "12px 0",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            position: "fixed",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: "45px",
+            zIndex: 10,
           }}
         >
-          ☰
-        </button>
+          <button
+            onClick={() => setSidebarVisible(true)}
+            style={{
+              fontSize: "24px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              marginLeft: "-12px",
+            }}
+          >
+            ☰
+          </button>
 
-        <Link
-          to="/"
-          style={{
-            textDecoration: "none",
-            color: "inherit",
-            flexGrow: 1,
-          }}
-        >
-          <h2 style={{ margin: 0 }}>PixPick</h2>
-        </Link>
+          <Link
+            to="/"
+            style={{
+              textDecoration: "none",
+              color: "inherit",
+              flexGrow: 1,
+            }}
+          >
+            <h2 style={{ margin: 0 }}>PixPick</h2>
+          </Link>
 
-        <button
-          onClick={logout}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#f9a2a2ff", // light grey
-            color: "#333",
-            border: "none",
-            borderRadius: "10px",
-            cursor: "pointer",
-            marginRight: "12px",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-            transition: "background 0.2s ease",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "#d5d5d5")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "#e0e0e0")
-          }
-        >
-          Logout
-        </button>
-      </div>)}
+          <button
+            onClick={logout}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#f9a2a2ff", // light grey
+              color: "#333",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              marginRight: "12px",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+              transition: "background 0.2s ease",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#d5d5d5")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "#e0e0e0")
+            }
+          >
+            Logout
+          </button>
+        </div>
+      )}
 
       {/* Sidebar Modal Overlay */}
       <div
@@ -128,7 +130,6 @@ export default function App() {
         onClick={() => setSidebarVisible(false)}
       >
         <div
-          
           style={{
             width: "260px", // THIS IS THE WIDTH OF THE SIDEBAR
             height: "100%",
@@ -156,13 +157,22 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{  padding: '0.6rem', marginTop: isBoardPage ? "0px" : "60px", transition: "margin-top 0.3s ease" }}>
+      <div
+        style={{
+          padding: "0.6rem",
+          marginTop: isBoardPage ? "0px" : "calc(60px + 12px)", // header height + extra space
+          transition: "margin-top 0.3s ease",
+        }}
+      >
         <Routes>
-          <Route path="/"
+          <Route
+            path="/"
             element={
               <>
-                <h2>{selected}</h2>
-                <CreateBoardModal user={user} onCreate={() => {}} />
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <h2 style={{ margin: 0 }}>{selected}</h2>
+                  <CreateBoardModal user={user} onCreate={() => {}} />
+                </div>
                 <BoardList user={user} selected={selected} />
               </>
             }
