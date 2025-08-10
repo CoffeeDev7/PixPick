@@ -42,27 +42,30 @@ export default function CreateBoardModal({ user, onCreate }) {
         onClick={() => setIsOpen(true)}
         style={{
           marginLeft: "8px",
-          width: "34px",
-          height: "34px",
-          borderRadius: "6px",
-          backgroundColor: "#f1f3f4",
-          border: "none",
-          fontSize: "22px",
+          width: "36px",
+          height: "36px",
+          borderRadius: "50%",
+          backgroundColor: "#f8f9fa",
+          border: "1px solid #e0e0e0",
+          fontSize: "20px",
           fontWeight: "bold",
           cursor: "pointer",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.08)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "background 0.2s ease",
+          transition: "all 0.2s ease",
           verticalAlign: "middle",
+          color: "#333",
         }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.backgroundColor = "#e0e0e0")
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.backgroundColor = "#f1f3f4")
-        }
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "#e9ecef";
+          e.currentTarget.style.boxShadow = "0 3px 6px rgba(0, 0, 0, 0.12)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "#f8f9fa";
+          e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+        }}
       >
         +
       </button>
@@ -80,8 +83,8 @@ export default function CreateBoardModal({ user, onCreate }) {
             display: "flex",
             alignItems: "flex-start", // ← instead of center
             justifyContent: "center",
-            paddingTop: "15vh",       // space from top
-            overflowY: "auto",        // allow scroll if keyboard pushes
+            paddingTop: "15vh", // space from top
+            overflowY: "auto", // allow scroll if keyboard pushes
             zIndex: 999,
           }}
           onClick={() => setIsOpen(false)}

@@ -52,7 +52,7 @@ export default function App() {
       {!isBoardPage && (
         <div
           style={{
-            backgroundColor: "#4facfe",
+            backgroundColor: "#1b999fff",
             padding: "12px 0",
             display: "flex",
             alignItems: "center",

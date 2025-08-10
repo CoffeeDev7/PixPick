@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
-
+import homeicon from "../assets/home.png"; // Adjust the path as needed
+import sharedicon from "../assets/people_10498917.png"; // Adjust the path as needed
+import allboardsicon from "../assets/cover_16398103.png"; // Adjust the path as needed
 export default function Sidebar({ selected, setSelected, setSidebarVisible, user }) {
   const tabs = ["My Boards", "Shared with Me", "All Boards"];
   const navigate = useNavigate();
@@ -10,6 +12,17 @@ export default function Sidebar({ selected, setSelected, setSidebarVisible, user
     setSidebarVisible(false);
   }
 
+  const iconMap = {
+  "My Boards": homeicon,
+  "Shared with Me": sharedicon,
+  "All Boards": allboardsicon,
+};
+const iconStyle = {
+  width: "20px",
+  height: "20px",
+  marginRight: "8px",
+  verticalAlign: "middle",
+};
   
 
   return (
@@ -58,7 +71,9 @@ export default function Sidebar({ selected, setSelected, setSidebarVisible, user
           }}
           onClick={() => handleTabClick(tab)}
         >
-          {tab}
+          <div style={{ display: "flex", alignItems: "center" }}>
+           <img src={iconMap[tab]} alt={`${tab} Icon`} style={iconStyle} /> {tab}
+          </div>
         </div>
       ))}
     </div>
