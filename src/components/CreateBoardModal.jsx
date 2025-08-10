@@ -129,7 +129,7 @@ export default function CreateBoardModal({ user, onCreate }) {
                 style={{
                   padding: "0 16px",
                   borderRadius: "8px",
-                  backgroundColor: "#4cafef",
+                  backgroundColor: "#ee6c4d",
                   border: "none",
                   color: "white",
                   fontSize: "16px",

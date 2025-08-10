@@ -68,10 +68,13 @@ useEffect(() => {
 }, [boardId]);
 
 
-  const showToast = (msg, type = 'info', duration = 5000) => {
-  setToast({ msg, type });
+  // replace your old showToast with this
+const showToast = (msg, type = "info", duration = 5000) => {
+  // store the duration so progress bar can match it
+  setToast({ msg, type, duration });
   setTimeout(() => setToast(null), duration);
 };
+
 
 useEffect(() => {
   async function fetchCollaboratorProfiles() {
@@ -121,63 +124,102 @@ useEffect(() => {
     fetchBoardTitle();
   }, [boardId]);
 
-  const saveImageToFirestore = async (src) => {
-    const imageRef = collection(db, "boards", boardId, "images");
+const saveImageToFirestore = async (src) => {
+  const imageRef = collection(db, "boards", boardId, "images");
+
+  // nicer uploading toast with spinner and progress bar
+  showToast(
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <img
+        src="/eat (1).png"           // note: file should be in public/ as /eat (1).png
+        alt="Uploading"
+        style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }}
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontWeight: 600 }}>Uploading image…</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
+          Hold on — uploading to your board
+        </div>
+      </div>
+    </div>,
+    "info",
+    20000
+  );
+
+  try {
+    await addDoc(imageRef, {
+      src,
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      rating: null,
+    });
+
+    // success — compact polished toast
     showToast(
-      <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <img
-          src="/public/eat (1).png"
-          alt="uploading"
-          style={{ width: "80px", height: "80px" }}
-        />
-        Uploading image.....
-      </span>,
-      "info",
-      20000
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 10,
+            display: "grid",
+            placeItems: "center",
+            background: "linear-gradient(180deg,#ffffff10,#ffffff06)",
+          }}
+        >
+          <img src="/octopus.png" alt="Success" style={{ width: 46, height: 46 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ fontWeight: 700 }}>Image uploaded</div>
+          <div style={{ fontSize: 13, color: "#eafaf0" }}>Ready to view on the board</div>
+        </div>
+      </div>,
+      "success",
+      3500
     );
-    // show for 20s max
-
-    try {
-      await addDoc(imageRef, {
-        src,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        rating: null,
-      });
-      showToast("✅ Image uploaded", "success");showToast(
-        <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <img
-            src="/public/octopus.png"
-            alt="Success"
-            style={{ width: 70, height: 70 }}
-          />
-          Image uploaded !
-        </span>,
-        "success"
+  } catch (err) {
+    if (err?.message?.includes('The value of property "src" is longer than')) {
+      showToast(
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img src="/water.png" alt="Error" style={{ width: 64, height: 64, borderRadius: 8 }} />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ fontWeight: 700, color: "#ffdede" }}>Image too large</div>
+            <div style={{ fontSize: 13, color: "#ffdede" }}>
+              Try "Copy image address" instead of copying the image data.
+            </div>
+          </div>
+        </div>,
+        "error",
+        6000
       );
-
-    } catch (err) {
-      if (
-        err?.message?.includes('The value of property "src" is longer than')
-      ) {
-        showToast(
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <img
-              src="/water.png"
-              alt="Error"
-              style={{ width: 100, height: 100 }}
-            />
-            Image too large. Use "Copy image address" instead.
-          </span>,
-          "error"
-        );
-
-      } else {
-        console.error("Unexpected error saving image:", err);
-        showToast("❌ Failed to save image. Try again.", "error");
-      }
+    } else {
+      console.error("Unexpected error saving image:", err);
+      showToast(
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 10,
+              display: "grid",
+              placeItems: "center",
+              background: "rgba(255,255,255,0.06)",
+            }}
+          >
+            ❌
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ fontWeight: 700, color: "#ffdede" }}>Upload failed</div>
+            <div style={{ fontSize: 13, color: "#ffdede" }}>Try again in a moment.</div>
+          </div>
+        </div>,
+        "error",
+        5000
+      );
     }
-  };
+  }
+};
+
 
 
 
@@ -268,17 +310,21 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
 }, [boardId, collaboratorProfiles]);
 
   return (
-    <div style={{ marginTop: "0px"}}>
+    <div style={{ marginTop: "0px" }}>
       <h2
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "flex-start",
           userSelect: "none",
+          margin:0, // remove default heading margins
+          lineHeight: 1.06, // tighten line height so the title + subtitle are compact
+          marginBottom: "10px",
+          marginTop: "16px",
         }}
       >
         {boardTitle}{" "}
-        <span style={{ fontSize: "0.9rem", color: "#888" }}>
+        <span style={{ fontSize: "0.9rem", color: "#888",marginTop: "9px" }}>
           {images.length} {images.length === 1 ? "pick" : "picks"}
         </span>
       </h2>
@@ -287,7 +333,8 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "6px",
+          gap: "0px",
+          marginTop: "6px", // small gap — tweak (4px/6px/8px) to taste
           marginBottom: "12px",
           position: "relative", // ensure overlapping works well
         }}
@@ -319,7 +366,7 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
         style={{
           display: "block",
           width: "100%",
-          height: "80px",
+          height: "45px",
           border: "2px dashed #4caf50",
           background: "#eaffea",
           fontSize: "16px",
@@ -401,81 +448,134 @@ console.log("collaboratorprofiels:", collaboratorProfiles);
       )}
 
       {toast && (
+  <div
+    style={{
+      position: "fixed",
+      bottom: "84px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 1200,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      pointerEvents: "auto",
+    }}
+    role="status"
+    aria-live="polite"
+  >
+    {/* card */}
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        alignItems: "center",
+        padding: "12px 14px",
+        minWidth: 220,
+        maxWidth: 420,
+        borderRadius: 12,
+        boxShadow: "0 10px 30px rgba(8,10,20,0.35)",
+        color: "#fff",
+        background:
+          toast.type === "error"
+            ? "linear-gradient(180deg,#6f1f1f,#5b1515)"
+            : toast.type === "success"
+            ? "linear-gradient(180deg,#1b7a2b,#16621f)"
+            : "linear-gradient(180deg,#2b5fa8,#1b4aa0)",
+      }}
+    >
+      {/* left icon / avatar */}
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 10,
+          display: "grid",
+          placeItems: "center",
+          background: "rgba(255,255,255,0.06)",
+          flexShrink: 0,
+        }}
+      >
+        {/* simple icons — adjust if you want SVGs */}
+        {toast.type === "success" ? (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M20 6L9 17l-5-5" stroke="#e6ffef" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : toast.type === "error" ? (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M18 6L6 18M6 6l12 12" stroke="#ffdede" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          // info spinner
+          <div style={{ width: 18, height: 18, border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        )}
+      </div>
+
+      {/* message */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: "1.05" }}>
+          {/* if msg is JSX it will render; if string it will render too */}
+          {toast.msg}
+        </div>
+      </div>
+
+      {/* close button */}
+      <button
+        onClick={() => setToast(null)}
+        aria-label="Dismiss"
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.9)",
+          cursor: "pointer",
+          fontSize: 16,
+          padding: 8,
+          marginLeft: 8,
+        }}
+      >
+        ×
+      </button>
+    </div>
+
+    {/* progress bar for info type */}
+    {toast.type === "info" && (
+      <div
+        style={{
+          height: 6,
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: 6,
+          overflow: "hidden",
+          background: "rgba(255,255,255,0.08)",
+        }}
+      >
         <div
           style={{
-            position: "fixed",
-            bottom: "100px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background:
-              toast.type === "error"
-                ? "#363e4fff"
-                : toast.type === "success"
-                ? "#4caf50"
-                : "#555",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: "6px",
-            zIndex: 999,
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.95)",
-            fontSize: "14px",
-            minWidth: "180px",
-            maxWidth: "280px",
-            textAlign: "center",
-            fontFamily: "sans-serif",
-            transition: "all 0.3s ease",
+            height: "100%",
+            width: "100%",
+            background: "linear-gradient(90deg,#ffffff80,#ffffff40)",
+            transformOrigin: "left",
+            animation: `toast-progress ${toast.duration || 20000}ms linear forwards`,
           }}
-        >
-          <div>{toast.msg}</div>
+        />
+      </div>
+    )}
 
-          {/* Only show progress bar for info type */}
-          {toast.type === "info" && (
-            <div
-              style={{
-                marginTop: "6px",
-                height: "4px",
-                width: "100%",
-                background: "rgba(255, 255, 255, 0.2)",
-                borderRadius: "2px",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: "100%",
-                  background: "rgba(255, 255, 255, 0.6)",
-                  animation: "shrink 20s linear forwards",
-                }}
-              />
-            </div>
-          )}
-          {console.log("CollaboratorProfiles:", collaboratorProfiles)}
-
-          {collaboratorProfiles.map((profile) => (
-            <img
-              key={profile.uid}
-              src={profile.photoURL}
-              alt={profile.displayName}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                marginLeft: -8,
-              }}
-            />
-          ))}
-
-          <style>
-            {`
-        @keyframes shrink {
-          from { width: 100%; }
-          to { width: 0%; }
+    {/* styles */}
+    <style>
+      {`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes toast-progress {
+          from { transform: scaleX(1); opacity: 1; }
+          to { transform: scaleX(0); opacity: 0.6; }
         }
       `}
-          </style>
-        </div>
-      )}
+    </style>
+  </div>
+)}
+
     </div>
   );
 }
