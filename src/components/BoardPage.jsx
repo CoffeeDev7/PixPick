@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import {
   doc,
@@ -19,6 +19,7 @@ import {
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState('');
@@ -55,6 +56,37 @@ export default function BoardPage({ user }) {
     setToast({ msg, type, duration });
     setTimeout(() => setToast(null), duration);
   };
+
+  const handleBack = () => {
+  // 1) prefer explicit from-state (set when linking)
+  if (location.state && location.state.from) {
+    navigate(location.state.from);
+    return;
+  }
+
+  // 2) if there's history, go back
+  if (window.history.length > 1) {
+    navigate(-1);
+    return;
+  }
+
+  // 3) if referrer is same-origin (safer than blindly trusting it)
+  try {
+    if (document.referrer) {
+      const ref = new URL(document.referrer);
+      if (ref.origin === window.location.origin) {
+        // go to referrer path
+        navigate(-1); // safe: browser will go back to referrer
+        return;
+      }
+    }
+  } catch (err) {
+    // fallthrough to fallback
+  }
+
+  // 4) final fallback
+  navigate('/');
+};
 
   // -------------------- collaborators UIDs --------------------
   useEffect(() => {
@@ -409,36 +441,60 @@ export default function BoardPage({ user }) {
     // console.log('collaboratorprofiels:', collaboratorProfiles);
   }, [boardId, collaboratorProfiles]);
 
+const menuRef = useRef(null);
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowBoardMenu(false);
+      }
+    }
+
+    if (showBoardMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showBoardMenu]);
+
   return (
     <div style={{ marginTop: "0px" }}>
-      <div
+      {/* boardpage HEADER kinda */}
+      <div style={{display:"flex", justifyContent:"space-between", margin:"0px"}}>
+        <button
+        onClick={handleBack}
+        aria-label="Back"
         style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 1,
+          marginRight: 8,
+          display: "inline-flex",
+          alignItems: "center",
+          outline: "none",
         }}
       >
-        <h2
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            userSelect: "none",
-            margin: 0,
-            lineHeight: 1.06,
-            marginBottom: "10px",
-            marginTop: "16px",
-          }}
+        {/* simple left arrow */}
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#333"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          {boardTitle}{" "}
-          <span style={{ fontSize: "0.9rem", color: "#888", marginTop: "9px" }}>
-            {images.length} {images.length === 1 ? "pick" : "picks"}{" "}
-            <span style={{ margin: "0 6px" }}>·</span> {lastOpenedShort}
-          </span>
-        </h2>
-
-        {/* 3-dots menu button */}
-        <div style={{ position: "relative" }}>
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      {/* 3-dots menu button */}
+        <div style={{ position: "relative" }} ref={menuRef}>
           <button
             aria-label="Board menu"
             onClick={() => setShowBoardMenu((s) => !s)}
@@ -448,6 +504,7 @@ export default function BoardPage({ user }) {
               cursor: "pointer",
               padding: 8,
               marginTop: 8,
+              outline: "none",
             }}
           >
             {/* simple 3 dot icon */}
@@ -514,6 +571,36 @@ export default function BoardPage({ user }) {
         </div>
       </div>
 
+      {/* h2, picks, last opened */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginLeft: "8px",
+        }}
+      >
+        <h2
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            userSelect: "none",
+            margin: 0,
+            lineHeight: 1.06,
+            marginBottom: "10px",
+          }}
+        >
+          {boardTitle}{" "}
+          <span style={{ fontSize: "0.9rem", color: "#888", marginTop: "9px" }}>
+            {images.length} {images.length === 1 ? "pick" : "picks"}{" "}
+            <span style={{ margin: "0 6px" }}>·</span> {lastOpenedShort}
+          </span>
+        </h2>
+
+        
+      </div>
+
       {/* Collaborators */}
       <div
         style={{
@@ -523,6 +610,7 @@ export default function BoardPage({ user }) {
           marginTop: "6px",
           marginBottom: "12px",
           position: "relative",
+          marginLeft: "8px",
         }}
       >
         {collaboratorProfiles.map((profile, i) => (

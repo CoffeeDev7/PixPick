@@ -503,7 +503,7 @@ useEffect(() => {
             <div
               key={board.id}
               className="board-item"
-              onClick={() => navigate(`/board/${board.id}`)}
+              onClick={() => navigate(`/board/${board.id}`, { state: { from: location.pathname } })}
             >
               <div className="board-cover">
                 <div className="main-image">
@@ -557,8 +557,8 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* 3-dot menu */}
-              <div
+              {/* 3 dot menu --> commenting out this because its already in boardpage. */}
+              {/* <div
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpenFor(board.id);
@@ -573,7 +573,7 @@ useEffect(() => {
                 }}
               >
                 ⋮
-              </div>
+              </div> */}
 
               {menuOpenFor === board.id && (
                 <div
