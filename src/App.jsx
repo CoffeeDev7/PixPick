@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+import React from "react";
 
 
 export default function App() {
@@ -45,23 +46,97 @@ async function login() {
   );
 }
 
+// SplashScreen.jsx
+
+
 function SplashScreen() {
   return (
-    <div style={{
-      height: "600px",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center", // light background like Miro
-    }}>
-      <img 
-        src="/public/dragon.png" // replace with your logo
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        flexDirection: "column",
+        background: "linear-gradient(135deg, #fceabb, #f8b500)",
+      }}
+    >
+      {/* Bouncing Dragon */}
+      <img
+        src="/dragon.png" // keep in public folder
         alt="App Logo"
-        className='dragon'
-        style={{ width: 80, height: 80, opacity: 0.9 }}
+        style={{
+          width: 100,
+          height: 100,
+          animation: "bounce 1.5s ease-in-out infinite",
+        }}
       />
+
+      {/* Tagline */}
+      <p
+        style={{
+          marginTop: 12,
+          fontSize: "1.1rem",
+          fontWeight: 500,
+          color: "#333",
+          fontFamily: "'Comic Neue', cursive",
+        }}
+      >
+        Loading your magical adventure board...
+      </p>
+
+      {/* Loading Dots */}
+      <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#333",
+            animation: "pulse 0.6s infinite alternate",
+          }}
+        />
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#333",
+            animation: "pulse 0.6s infinite alternate",
+            animationDelay: "0.2s",
+          }}
+        />
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#333",
+            animation: "pulse 0.6s infinite alternate",
+            animationDelay: "0.4s",
+          }}
+        />
+      </div>
+
+      {/* Keyframes injected inline */}
+      <style>
+        {`
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes pulse {
+            from { opacity: 0.4; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+          }
+        `}
+      </style>
     </div>
   );
 }
+
+
+
 
 const logout = async () => {
   try {
@@ -79,7 +154,7 @@ if (authLoading) {
 
 if (!user) return <LoginPage login={login} />;
 
- 
+
 
   return (
     <div className="fade-in" style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
@@ -233,3 +308,7 @@ if (!user) return <LoginPage login={login} />;
     </div>
   );
 }
+
+
+
+
