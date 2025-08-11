@@ -48,7 +48,7 @@ export default function App() {
 
   return (
     <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
-      {/* TOP BLUE HEADER */}
+      {/* TOP Deep Teal HEADER */}
       {!isBoardPage && (
         <div
           style={{
@@ -100,33 +100,32 @@ export default function App() {
           </Link>
 
           <button
-  onClick={logout}
-  style={{
-    padding: "8px 16px",
-    backgroundColor: "#ee6c4d", // soft red-pink tone#f9a2a2
-    color: "#333",
-    border: "none",
-    borderRadius: "10px",
-    cursor: "pointer",
-    marginRight: "12px",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-    transition: "all 0.25s ease",
-    fontWeight: "500",
-  }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.backgroundColor = "#f77b7b"; // deeper pink-red
-    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
-    e.currentTarget.style.transform = "translateY(-2px)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.backgroundColor = "#f9a2a2";
-    e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
-    e.currentTarget.style.transform = "translateY(0)";
-  }}
->
-  Logout
-</button>
-
+            onClick={logout}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#ee6c4d", // soft red-pink tone#f9a2a2
+              color: "#333",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              marginRight: "12px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+              transition: "all 0.25s ease",
+              fontWeight: "500",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#f77b7b"; // deeper pink-red
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#f9a2a2";
+              e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Logout
+          </button>
         </div>
       )}
 

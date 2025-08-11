@@ -22,6 +22,7 @@ export default function BoardList({ user, selected }) {
   const [menuOpenFor, setMenuOpenFor] = useState(null);
   const [latestboardimages, setlatestboardimages] = useState({});
   const [viewMode, setViewMode] = useState("wide"); // "wide" or "compact" or "plain"
+  const [imagesLoading, setImagesLoading] = useState(true); // NEW: loading flag for images
   const navigate = useNavigate();
   const menuRef = useRef();
 
@@ -80,6 +81,7 @@ export default function BoardList({ user, selected }) {
     if (!user) return;
 
     const fetchBoardsWithImages = async () => {
+      setImagesLoading(true); // show skeletons while fetching
       let boardsQuery;
       if (selected === "My Boards") {
         boardsQuery = query(
@@ -121,6 +123,7 @@ export default function BoardList({ user, selected }) {
       );
 
       setlatestboardimages(newLatestImages);
+      setImagesLoading(false); // done loading
     };
 
     fetchBoardsWithImages();
@@ -326,13 +329,14 @@ export default function BoardList({ user, selected }) {
         }
 
         .seg-btn:focus {
-          box-shadow: 0 0 0 4px rgba(34, 100, 255, 0.08);
+          outline: none;
+          box-shadow: 0 0 0 4px rgba(27, 153, 159, 0.90); /* teal glow focus ring */
         }
 
         .seg-btn.active {
-          background: linear-gradient(180deg, rgba(16,16,20,0.04), rgba(16,16,20,0.02));
-          color: #111;
-          box-shadow: 0 6px 14px rgba(16,16,20,0.06);
+          background: #1b999f; /* your teal */
+          color: white;
+          box-shadow: 0 6px 14px rgba(16,16,20,0.46);
           transform: translateY(-1px);
         }
 
@@ -357,6 +361,27 @@ export default function BoardList({ user, selected }) {
           clip: rect(0,0,0,0);
           white-space: nowrap;
           border: 0;
+        }
+
+        /* Skeleton styles */
+        .skeleton {
+          background: linear-gradient(90deg, #e9e9eb 0%, #f3f3f4 50%, #e9e9eb 100%);
+          background-size: 200% 100%;
+          animation: shimmer 1.2s linear infinite;
+        }
+        .skeleton.rect {
+          width: 100%;
+          height: 100%;
+          border-radius: 10px;
+        }
+        .preview-skeleton {
+          width: 100%;
+          height: 50%;
+          border-radius: 6px;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
         }
       `}</style>
 
@@ -418,29 +443,44 @@ export default function BoardList({ user, selected }) {
             >
               <div className="board-cover">
                 <div className="main-image">
-                  <img
-                    src={
-                      imgs[0] ||
-                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                    }
-                    alt=""
-                  />
+                  {/* show skeleton while loading, otherwise show image */}
+                  {imagesLoading ? (
+                    <div className="skeleton rect" />
+                  ) : (
+                    <img
+                      src={
+                        imgs[0] ||
+                        "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                      }
+                      alt=""
+                    />
+                  )}
                 </div>
                 <div className="preview-images">
-                  <img
-                    src={
-                      imgs[1] ||
-                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                    }
-                    alt=""
-                  />
-                  <img
-                    src={
-                      imgs[2] ||
-                      "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                    }
-                    alt=""
-                  />
+                  {/* two preview slots — render skeletons when loading */}
+                  {imagesLoading ? (
+                    <>
+                      <div className="skeleton preview-skeleton" />
+                      <div className="skeleton preview-skeleton" />
+                    </>
+                  ) : (
+                    <>
+                      <img
+                        src={
+                          imgs[1] ||
+                          "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                        }
+                        alt=""
+                      />
+                      <img
+                        src={
+                          imgs[2] ||
+                          "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
+                        }
+                        alt=""
+                      />
+                    </>
+                  )}
                 </div>
               </div>
 
