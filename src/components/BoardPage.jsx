@@ -1,6 +1,5 @@
-// src/components/BoardPage.jsx
-import { use, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import {
   doc,
@@ -13,18 +12,23 @@ import {
   orderBy,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
+  limit,
 } from 'firebase/firestore';
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
+  const navigate = useNavigate();
+
   const [images, setImages] = useState([]);
-  const [boardTitle, setBoardTitle] = useState("");
-  const [toast, setToast] = useState(null); // { msg: string, type: 'info' | 'error' | 'success' }
+  const [boardTitle, setBoardTitle] = useState('');
+  const [toast, setToast] = useState(null); // { msg, type, duration }
   const [modalIndex, setModalIndex] = useState(null);
 
   const pasteRef = useRef();
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
+
   const [collaborators, setCollaborators] = useState([]);
   const [collaboratorUIDs, setCollaboratorUIDs] = useState([]);
   const [collaboratorProfiles, setcollaboratorProfiles] = useState([]);
@@ -32,123 +36,213 @@ export default function BoardPage({ user }) {
   // NEW: loading flag for images
   const [imagesLoading, setImagesLoading] = useState(true);
 
-  // fetch collaborator UIDs when the boardId changes
+  // Long-press state for showing delete overlay on a particular image
+  const [longPressedIndex, setLongPressedIndex] = useState(null);
+  const longPressTimerRef = useRef(null);
+  const LONG_PRESS_MS = 400; // 300ms like Pinterest
+
+  // Board menu (3-dots)
+  const [showBoardMenu, setShowBoardMenu] = useState(false);
+
+  // store a short 'last opened' string
+  const [lastOpenedShort, setLastOpenedShort] = useState('');
+
+  // put once in the component body (used by other effects sometimes)
+  const imagesUnsubRef = useRef(null);
+
+  // -------------------- Toast helper --------------------
+  const showToast = (msg, type = 'info', duration = 5000) => {
+    setToast({ msg, type, duration });
+    setTimeout(() => setToast(null), duration);
+  };
+
+  // -------------------- collaborators UIDs --------------------
   useEffect(() => {
     async function fetchCollaboratorAndOwnerUIDs() {
       if (!boardId) return;
 
-      // 1. Get the board document to extract owner UID
-      const boardRef = doc(db, "boards", boardId);
+      const boardRef = doc(db, 'boards', boardId);
       const boardSnap = await getDoc(boardRef);
       if (!boardSnap.exists()) return;
 
-      const ownerUID = boardSnap.data().owner;
+      // note: some of your code used "owner" vs "ownerId" in other places.
+      // here we read whichever exists to be safe.
+      const data = boardSnap.data();
+      const ownerUID = data.owner || data.ownerId || null;
 
-      // 2. Get all collaborator document IDs
-      const collaboratorsRef = collection(db, "boards", boardId, "collaborators");
+      const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
       const collaboratorsSnap = await getDocs(collaboratorsRef);
-      const collaboratorIDs = collaboratorsSnap.docs.map(doc => doc.id);
+      const collaboratorIDs = collaboratorsSnap.docs.map((d) => d.id);
 
-      // 3. Merge and remove duplicates using Set
-      // ✅ Remove undefined using .filter(Boolean)
       const allUIDs = Array.from(new Set([ownerUID, ...collaboratorIDs].filter(Boolean)));
-
-      // 4. Save to state
       setCollaboratorUIDs(allUIDs);
+
+      // update lastOpenedAt to signal board was opened (useful for the "last opened" display)
+      try {
+        await updateDoc(boardRef, { lastOpenedAt: serverTimestamp() });
+      } catch (err) {
+        // ignore if user can't write
+        // console.warn('Could not update lastOpenedAt', err);
+      }
     }
 
     fetchCollaboratorAndOwnerUIDs();
   }, [boardId]);
 
+  // realtime collaborators list
   useEffect(() => {
+    if (!boardId) return;
     const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
     const unsubscribe = onSnapshot(collaboratorsRef, (snapshot) => {
-      setCollaborators(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCollaborators(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
   }, [boardId]);
 
-
-  // replace your old showToast with this
-  const showToast = (msg, type = "info", duration = 5000) => {
-    // store the duration so progress bar can match it
-    setToast({ msg, type, duration });
-    setTimeout(() => setToast(null), duration);
-  };
-
-
+  // -------------------- profile caching + fetching --------------------
   useEffect(() => {
     async function fetchCollaboratorProfiles() {
       if (!collaboratorUIDs || collaboratorUIDs.length === 0) return;
 
       try {
-        const promises = collaboratorUIDs.map(uid => getDoc(doc(db, "users", uid)));
-        const docs = await Promise.all(promises);
-        const profiles = docs.map(d => ({ uid: d.id, ...d.data() }));
-        setcollaboratorProfiles(profiles);
+        // helper to get profile from localStorage if fresh
+        const TTL = 1000 * 60 * 60 * 24; // 24 hours
+        const now = Date.now();
+
+        const results = await Promise.all(
+          collaboratorUIDs.map(async (uid) => {
+            try {
+              const cachedRaw = localStorage.getItem(`profile_${uid}`);
+              if (cachedRaw) {
+                const cached = JSON.parse(cachedRaw);
+                if (cached._cachedAt && now - cached._cachedAt < TTL) {
+                  console.log(`Profile for ${uid} loaded from cache`);
+                  // return cached shape
+                  return { uid, ...cached.data };
+                }
+              }
+
+              // If we reach here, no valid cache, so we fetch:
+              console.log(`Profile for ${uid} fetched from Firestore`);
+
+              // fetch from firestore and cache minimal fields
+              const userSnap = await getDoc(doc(db, 'users', uid));
+              const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', photoURL: '' };
+
+              const toStore = { displayName: userData.displayName || 'Unknown', photoURL: userData.photoURL || '' };
+              localStorage.setItem(
+                `profile_${uid}`,
+                JSON.stringify({ _cachedAt: now, data: toStore })
+              );
+
+              return { uid, ...toStore };
+            } catch (err) {
+              console.error('error fetching profile for', uid, err);
+              return { uid, displayName: 'Unknown', photoURL: '' };
+            }
+          })
+        );
+
+        setcollaboratorProfiles(results);
       } catch (error) {
-        console.error("Error fetching collaborator profiles:", error);
+        console.error('Error fetching collaborator profiles:', error);
       }
     }
 
     fetchCollaboratorProfiles();
-    console.log("collaboratorUIDs", collaboratorUIDs);
-    console.log("collaborators:", collaborators);
-
+    // debug logs
+    // console.log('collaboratorUIDs', collaboratorUIDs);
+    // console.log('collaborators:', collaborators);
   }, [collaboratorUIDs]);
 
-
+  // -------------------- realtime images subscription --------------------
   useEffect(() => {
-    // show skeletons while (re)subscribing to images
-    setImagesLoading(true);
+    if (!boardId) return;
 
-    const q = query(
-      collection(db, "boards", boardId, "images"),
-      orderBy("createdAt", "desc")
+    setImagesLoading(true); // show skeletons while we subscribe
+
+    const q = query(collection(db, 'boards', boardId, 'images'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setImages(items);
+        setImagesLoading(false);
+      },
+      (err) => {
+        console.error('images onSnapshot error', err);
+        setImagesLoading(false);
+      }
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setImages(items);
-      // once we have an initial snapshot, hide skeletons
-      setImagesLoading(false);
-    });
-    return () => unsubscribe();
+
+    // keep ref in case you want to manually unsubscribe elsewhere
+    imagesUnsubRef.current = unsubscribe;
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+      imagesUnsubRef.current = null;
+    };
   }, [boardId]);
 
-
+  // -------------------- fetch board title + lastOpened short --------------------
   useEffect(() => {
     const fetchBoardTitle = async () => {
-      const boardRef = doc(db, "boards", boardId);
+      if (!boardId) return;
+      const boardRef = doc(db, 'boards', boardId);
       const boardSnap = await getDoc(boardRef);
       if (boardSnap.exists()) {
         const data = boardSnap.data();
-        setBoardTitle(data.title || "(Untitled)");
+        setBoardTitle(data.title || '(Untitled)');
+
+        // compute short lastOpened string if present
+        const ts = data.updatedAt || data.createdAt || null; //removed data.lastOpenedAt since i dont need it now
+        if (ts) setLastOpenedShort(timeAgoShort(ts));
+        else setLastOpenedShort('');
       } else {
-        setBoardTitle("(Board not found)");
+        setBoardTitle('(Board not found)');
       }
     };
+
     fetchBoardTitle();
   }, [boardId]);
 
-  const saveImageToFirestore = async (src) => {
-    const imageRef = collection(db, "boards", boardId, "images");
+  // helper to compute short relative time (e.g. 45m, 2h, 3d)
+  function timeAgoShort(ts) {
+    // ts might be Firestore Timestamp ({ seconds, nanoseconds }) or a JS Date
+    let ms = 0;
+    if (!ts) return '';
+    if (ts.toDate) {
+      ms = ts.toDate().getTime();
+    } else if (ts.seconds) {
+      ms = ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+    } else if (typeof ts === 'number') {
+      ms = ts;
+    } else if (ts instanceof Date) ms = ts.getTime();
+    else return '';
 
-    // nicer uploading toast with spinner and progress bar
+    const diff = Date.now() - ms;
+    const mins = Math.round(diff / (1000 * 60));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.round(hours / 24);
+    return `${days}d`;
+  }
+
+  // -------------------- image saving / paste handling (unchanged mostly) --------------------
+  const saveImageToFirestore = async (src) => {
+    const imageRef = collection(db, 'boards', boardId, 'images');
+
     showToast(
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <img
-          src="/eat (1).png"           // note: file should be in public/ as /eat (1).png
-          alt="Uploading"
-          style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <img src="/eat (1).png" alt="Uploading" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontWeight: 600 }}>Uploading image…</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
-            Hold on — uploading to your board
-          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>Hold on — uploading to your board</div>
         </div>
       </div>,
-      "info",
+      'info',
       20000
     );
 
@@ -160,79 +254,32 @@ export default function BoardPage({ user }) {
         rating: null,
       });
 
-      // success — compact polished toast
       showToast(
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 10,
-              display: "grid",
-              placeItems: "center",
-              background: "linear-gradient(180deg,#ffffff10,#ffffff06)",
-            }}
-          >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(180deg,#ffffff10,#ffffff06)' }}>
             <img src="/octopus.png" alt="Success" style={{ width: 46, height: 46 }} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontWeight: 700 }}>Image uploaded</div>
-            <div style={{ fontSize: 13, color: "#eafaf0" }}>Ready to view on the board</div>
+            <div style={{ fontSize: 13, color: '#eafaf0' }}>Ready to view on the board</div>
           </div>
         </div>,
-        "success",
+        'success',
         3500
       );
     } catch (err) {
-      if (err?.message?.includes('The value of property "src" is longer than')) {
-        showToast(
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/water.png" alt="Error" style={{ width: 64, height: 64, borderRadius: 8 }} />
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontWeight: 700, color: "#ffdede" }}>Image too large</div>
-              <div style={{ fontSize: 13, color: "#ffdede" }}>
-                Try "Copy image address" instead of copying the image data.
-              </div>
-            </div>
-          </div>,
-          "error",
-          6000
-        );
-      } else {
-        console.error("Unexpected error saving image:", err);
-        showToast(
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 10,
-                display: "grid",
-                placeItems: "center",
-                background: "rgba(255,255,255,0.06)",
-              }}
-            >
-              ❌
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontWeight: 700, color: "#ffdede" }}>Upload failed</div>
-              <div style={{ fontSize: 13, color: "#ffdede" }}>Try again in a moment.</div>
-            </div>
-          </div>,
-          "error",
-          5000
-        );
-      }
+      console.error('Unexpected error saving image:', err);
+      showToast('Upload failed — try again', 'error', 5000);
     }
   };
 
   const handlePaste = async (event) => {
     let handled = false;
-    const text = event.clipboardData.getData("text");
+    const text = event.clipboardData.getData('text');
 
     if (event.clipboardData && event.clipboardData.items) {
       for (let item of event.clipboardData.items) {
-        if (item.type.indexOf("image") === 0) {
+        if (item.type.indexOf('image') === 0) {
           const file = item.getAsFile();
           const reader = new FileReader();
           reader.onload = async function (e) {
@@ -258,79 +305,214 @@ export default function BoardPage({ user }) {
     } else if (isGoogleRedirect) {
       showToast("⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'.");
       handled = true;
-    } else if (isDirectImageLink || text.startsWith("data:image/")) {
+    } else if (isDirectImageLink || text.startsWith('data:image/')) {
       await saveImageToFirestore(text);
       handled = true;
     }
 
     if (handled) event.preventDefault();
-    event.target.value = "";
+    event.target.value = '';
   };
 
-  const handleTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX;
+  // -------------------- long-press handlers --------------------
+  const startLongPress = (index) => {
+    // start timer
+    longPressTimerRef.current = setTimeout(() => {
+      setLongPressedIndex(index);
+    }, LONG_PRESS_MS);
   };
-
-  const handleTouchEnd = () => {
-    if (touchStartX.current !== null && touchEndX.current !== null) {
-      const delta = touchEndX.current - touchStartX.current;
-      const threshold = 50;
-      if (delta > threshold) {
-         setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-      } else if (delta < -threshold) {
-        setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-      }
-
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
-    touchStartX.current = null;
-    touchEndX.current = null;
   };
 
-  // keyword navigation
+  // delete single image
+  const handleDeleteImage = async (imageId, index) => {
+    const confirmDelete = window.confirm('Delete this pick?');
+    if (!confirmDelete) {
+      setLongPressedIndex(null);
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'boards', boardId, 'images', imageId));
+      showToast('Pick deleted', 'success', 2500);
+      setLongPressedIndex(null);
+    } catch (err) {
+      console.error('delete image error', err);
+      showToast('Could not delete pick', 'error', 3000);
+    }
+  };
+
+  // -------------------- board rename / delete (3-dot menu) --------------------
+  const handleRename = async (boardIdParam, currentTitle) => {
+    const newTitle = prompt('Enter new title', currentTitle);
+    if (newTitle && newTitle.trim() !== '') {
+      const boardRef = doc(db, 'boards', boardIdParam);
+      const capitalizedTitle = newTitle.trim().charAt(0).toUpperCase() + newTitle.trim().slice(1);
+      try {
+        await updateDoc(boardRef, { title: capitalizedTitle });
+        showToast('Board renamed', 'success', 2000);
+        setShowBoardMenu(false);
+      } catch (err) {
+        console.error('rename error', err);
+        showToast('Could not rename board', 'error', 3000);
+      }
+    }
+  };
+
+  const handleDeleteBoard = async (boardIdParam) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this board?');
+    if (!confirmDelete) return;
+
+    try {
+      // delete subcollections (images + collaborators) then the board doc
+      // NOTE: recursive collection deletion isn't provided on client SDK — this loops and deletes each doc.
+      const imagesSnap = await getDocs(collection(db, 'boards', boardIdParam, 'images'));
+      await Promise.all(imagesSnap.docs.map((d) => deleteDoc(doc(db, 'boards', boardIdParam, 'images', d.id))));
+
+      const collabSnap = await getDocs(collection(db, 'boards', boardIdParam, 'collaborators'));
+      await Promise.all(collabSnap.docs.map((d) => deleteDoc(doc(db, 'boards', boardIdParam, 'collaborators', d.id))));
+
+      // finally delete the board doc
+      await deleteDoc(doc(db, 'boards', boardIdParam));
+
+      showToast('Board deleted', 'success', 2000);
+      navigate('/'); // go back to board list
+    } catch (err) {
+      console.error('delete board error', err);
+      showToast('Could not delete board', 'error', 3000);
+    }
+  };
+
+  // -------------------- keyboard navigation (unchanged) --------------------
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (modalIndex === null) return;
 
-      if (e.key === "ArrowLeft") {
-        setModalIndex((prev) =>
-          prev === 0 ? (images.length - 1) : prev - 1
-        );
-      } else if (e.key === "ArrowRight") {
-        setModalIndex((prev) =>
-          prev === images.length - 1 ? 0 : prev + 1
-        );
-      } else if (e.key === "Escape") {
+      if (e.key === 'ArrowLeft') {
+        setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+      } else if (e.key === 'Escape') {
         setModalIndex(null);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [modalIndex, images.length]);
 
+  // -------------------- debug / logging --------------------
   useEffect(() => {
-    console.log("collaboratorprofiels:", collaboratorProfiles);
+    // console.log('collaboratorprofiels:', collaboratorProfiles);
   }, [boardId, collaboratorProfiles]);
 
   return (
     <div style={{ marginTop: "0px" }}>
-      <h2
+      <div
         style={{
           display: "flex",
-          flexDirection: "column",
           alignItems: "flex-start",
-          userSelect: "none",
-          margin: 0,
-          lineHeight: 1.06,
-          marginBottom: "10px",
-          marginTop: "16px",
+          justifyContent: "space-between",
         }}
       >
-        {boardTitle}{" "}
-        <span style={{ fontSize: "0.9rem", color: "#888", marginTop: "9px" }}>
-          {images.length} {images.length === 1 ? "pick" : "picks"}
-        </span>
-      </h2>
+        <h2
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            userSelect: "none",
+            margin: 0,
+            lineHeight: 1.06,
+            marginBottom: "10px",
+            marginTop: "16px",
+          }}
+        >
+          {boardTitle}{" "}
+          <span style={{ fontSize: "0.9rem", color: "#888", marginTop: "9px" }}>
+            {images.length} {images.length === 1 ? "pick" : "picks"}{" "}
+            <span style={{ margin: "0 6px" }}>·</span> {lastOpenedShort}
+          </span>
+        </h2>
+
+        {/* 3-dots menu button */}
+        <div style={{ position: "relative" }}>
+          <button
+            aria-label="Board menu"
+            onClick={() => setShowBoardMenu((s) => !s)}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 8,
+              marginTop: 8,
+            }}
+          >
+            {/* simple 3 dot icon */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#333"
+              strokeWidth="2"
+            >
+              <circle cx="5" cy="12" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="19" cy="12" r="1.6" />
+            </svg>
+          </button>
+
+          {showBoardMenu && (
+            <div
+              role="menu"
+              style={{
+                position: "absolute",
+                right: 0,
+                top: "36px",
+                minWidth: 160,
+                background: "#fff",
+                borderRadius: 8,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                padding: 8,
+                zIndex: 120,
+              }}
+            >
+              <button
+                onClick={() => handleRename(boardId, boardTitle)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: 8,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                Rename
+              </button>
+              <button
+                onClick={() => handleDeleteBoard(boardId)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: 8,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  color: "#b82b2b",
+                }}
+              >
+                Delete board
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Collaborators */}
       <div
@@ -449,14 +631,22 @@ export default function BoardPage({ user }) {
           images.map((img, i) => (
             <div
               key={img.id}
+              onMouseDown={() => startLongPress(i)}
+              onMouseUp={() => cancelLongPress()}
+              onMouseLeave={() => cancelLongPress()}
+              onTouchStart={() => startLongPress(i)}
+              onTouchEnd={() => cancelLongPress()}
+              onTouchCancel={() => cancelLongPress()}
               style={{
                 flex: "0 1 calc(50% - 6px)",
-                background: "white",
+                background: longPressedIndex === i ? "#fff" : "white", // ensure white bg when long-pressing
                 borderRadius: "8px",
                 boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
                 overflow: "hidden",
+                position: "relative",
               }}
             >
+              {/* Image itself; if longPress mode for this image is active, don't open modal on click */}
               <img
                 src={img.src}
                 alt="pasted"
@@ -466,8 +656,56 @@ export default function BoardPage({ user }) {
                   cursor: "pointer",
                   display: "block",
                 }}
-                onClick={() => setModalIndex(i)}
+                onClick={() => {
+                  if (longPressedIndex !== null) return; // ignore click when in long-press mode
+                  setModalIndex(i);
+                }}
               />
+
+              {/* long-press overlay with trash icon */}
+              {longPressedIndex === i && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(255,255,255,0.9)",
+                    zIndex: 40,
+                  }}
+                >
+                  <button
+                    onClick={() => handleDeleteImage(img.id, i)}
+                    aria-label="Delete pick"
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 12,
+                      display: "grid",
+                      placeItems: "center",
+                      border: "none",
+                      cursor: "pointer",
+                      background: "linear-gradient(180deg,#fff,#f6f6f6)",
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    {/* trash svg */}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      fill="currentColor"
+                      class="bi bi-trash"
+                      viewBox="0 0 16 16"
+                    >
+                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
+                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -490,11 +728,28 @@ export default function BoardPage({ user }) {
             justifyContent: "center",
             overflow: "hidden",
           }}
-          onTouchStart={handleTouchStart}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+          }}
           onTouchMove={(e) => {
             touchEndX.current = e.touches[0].clientX;
           }}
-          onTouchEnd={handleTouchEnd}
+          onTouchEnd={() => {
+            if (touchStartX.current !== null && touchEndX.current !== null) {
+              const delta = touchEndX.current - touchStartX.current;
+              const threshold = 50;
+              if (delta > threshold)
+                setModalIndex((prev) =>
+                  prev === 0 ? images.length - 1 : prev - 1
+                );
+              else if (delta < -threshold)
+                setModalIndex((prev) =>
+                  prev === images.length - 1 ? 0 : prev + 1
+                );
+            }
+            touchStartX.current = null;
+            touchEndX.current = null;
+          }}
         >
           <img
             src={images[modalIndex]?.src}
@@ -527,7 +782,6 @@ export default function BoardPage({ user }) {
           role="status"
           aria-live="polite"
         >
-          {/* Card */}
           <div
             style={{
               display: "flex",
@@ -604,7 +858,6 @@ export default function BoardPage({ user }) {
               )}
             </div>
 
-            {/* Message */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{ fontWeight: 700, fontSize: 14, lineHeight: "1.05" }}
@@ -613,7 +866,6 @@ export default function BoardPage({ user }) {
               </div>
             </div>
 
-            {/* Close */}
             <button
               onClick={() => setToast(null)}
               aria-label="Dismiss"
@@ -631,7 +883,6 @@ export default function BoardPage({ user }) {
             </button>
           </div>
 
-          {/* Progress bar */}
           {toast.type === "info" && (
             <div
               style={{
@@ -657,63 +908,18 @@ export default function BoardPage({ user }) {
             </div>
           )}
 
-          {/* Styles */}
-          <style>
-            {`
-               .shimmer {
-                position: relative;
-                overflow: hidden;
-                background: #e0e0e0; /* Base grey */
-              }
-
-              .shimmer::after {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -150%;
-                height: 100%;
-                width: 150%;
-                background: linear-gradient(
-                  90deg,
-                  rgba(224, 224, 224, 0) 0%,
-                  rgba(255, 255, 255, 0.7) 50%,
-                  rgba(224, 224, 224, 0) 100%
-                );
-                animation: shimmerMove 1.2s infinite linear;
-              }
-
-              @keyframes shimmerMove {
-                100% {
-                  left: 150%;
-                }
-              }
-
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-            @keyframes toast-progress {
-              from { transform: scaleX(1); opacity: 1; }
-              to { transform: scaleX(0); opacity: 0.6; }
-            }
-            .skeleton-dark {
-              background: linear-gradient(90deg, #cfcfd3 0%, #bfbfc3 50%, #cfcfd3 100%);
-              background-size: 200% 100%;
-              animation: shimmer-dark 1.1s linear infinite;
-            }
-            .skeleton-dark.rect {
-              width: 100%;
-              height: 100%;
-              border-radius: 8px;
-            }
-            @keyframes shimmer-dark {
-              0% { background-position: 200% 0; }
-              100% { background-position: -200% 0; }
-            }
-          `}
-          </style>
+          <style>{`
+               .shimmer { position: relative; overflow: hidden; background: #e0e0e0; }
+               .shimmer::after { content: ''; position: absolute; top: 0; left: -150%; height: 100%; width: 150%; background: linear-gradient(90deg, rgba(224,224,224,0) 0%, rgba(255,255,255,0.7) 50%, rgba(224,224,224,0) 100%); animation: shimmerMove 1.2s infinite linear; }
+               @keyframes shimmerMove { 100% { left: 150%; } }
+               @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+               @keyframes toast-progress { from { transform: scaleX(1); opacity: 1; } to { transform: scaleX(0); opacity: 0.6; } }
+               .skeleton-dark { background: linear-gradient(90deg, #cfcfd3 0%, #bfbfc3 50%, #cfcfd3 100%); background-size: 200% 100%; animation: shimmer-dark 1.1s linear infinite; }
+               .skeleton-dark.rect { width: 100%; height: 100%; border-radius: 8px; }
+               @keyframes shimmer-dark { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+          `}</style>
         </div>
       )}
     </div>
-  );}
-
+  );
+}
