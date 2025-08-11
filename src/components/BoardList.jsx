@@ -27,6 +27,8 @@ export default function BoardList({ user, selected }) {
   const [imagesLoading, setImagesLoading] = useState(true); // NEW: loading flag for images
   const navigate = useNavigate();
   const menuRef = useRef();
+  // put once in the component body (so the Map persists)
+const imagesUnsubsRef = useRef(new Map());
 
   // Fetch boards list
 useEffect(() => {
@@ -124,92 +126,71 @@ useEffect(() => {
 
 
   // Fetch latest 3 images for each board
-  useEffect(() => {
+useEffect(() => {
   if (!user) return;
 
-  const fetchBoardsWithImages = async () => {
-    setImagesLoading(true); // show skeletons while fetching
+  // boards should already be the state you're maintaining from the first useEffect
+  // If you don't have `boards` state yet, derive visible board ids the same way you did for fetchDocs.
+  setImagesLoading(true);
 
-    let boards = [];
+  const visibleBoardIds = boards.map((b) => b.id);
 
-    if (selected === "My Boards") {
-      // Boards owned by me
-      const ownedSnap = await getDocs(
-        query(
-          collection(db, "boards"),
-          where("ownerId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        )
-      );
-      boards = ownedSnap.docs;
-    }
+  // 1) Ensure listeners exist for visible boards
+  visibleBoardIds.forEach((boardId) => {
+    if (imagesUnsubsRef.current.has(boardId)) return; // already listening
 
-    else if (selected === "Shared with Me") {
-      // Get all boards where I'm in collaborators (not owner)
-      const allBoardsSnap = await getDocs(
-        query(collection(db, "boards"), orderBy("createdAt", "desc"))
-      );
+    const imagesRef = collection(db, "boards", boardId, "images");
+    const q = query(imagesRef, orderBy("createdAt", "desc"), limit(3));
 
-      // Filter by checking collaborators subcollection
-      const collabBoards = await Promise.all(
-        allBoardsSnap.docs.map(async (docSnap) => {
-          const collabDoc = await getDoc(
-            doc(db, "boards", docSnap.id, "collaborators", user.uid)
-          );
-          if (collabDoc.exists() && collabDoc.data().role !== "owner") {
-            return docSnap;
-          }
-          return null;
-        })
-      );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const latestImages = snap.docs.map((d) => d.data().src || "");
+        // update state (merge with previous)
+        setlatestboardimages((prev) => {
+          // avoid unnecessary state change when no difference (optional)
+          const old = prev[boardId] || [];
+          const same =
+            old.length === latestImages.length &&
+            old.every((v, i) => v === latestImages[i]);
+          if (same) return prev;
+          return { ...prev, [boardId]: latestImages };
+        });
 
-      boards = collabBoards.filter(Boolean);
-    }
-
-    else {
-      // All Boards = owned by me OR in collaborators
-      const allBoardsSnap = await getDocs(
-        query(collection(db, "boards"), orderBy("createdAt", "desc"))
-      );
-
-      const filteredBoards = await Promise.all(
-        allBoardsSnap.docs.map(async (docSnap) => {
-          const data = docSnap.data();
-          if (data.ownerId === user.uid) return docSnap;
-          const collabDoc = await getDoc(
-            doc(db, "boards", docSnap.id, "collaborators", user.uid)
-          );
-          if (collabDoc.exists()) return docSnap;
-          return null;
-        })
-      );
-
-      boards = filteredBoards.filter(Boolean);
-    }
-
-    // Fetch latest 3 images for each board
-    const newLatestImages = {};
-
-    await Promise.all(
-      boards.map(async (docSnap) => {
-        const boardId = docSnap.id;
-        const imagesRef = collection(db, "boards", boardId, "images");
-        const imageSnap = await getDocs(
-          query(imagesRef, orderBy("createdAt", "desc"), limit(3))
-        );
-        const latestImages = imageSnap.docs.map(
-          (imgDoc) => imgDoc.data().src || ""
-        );
-        newLatestImages[boardId] = latestImages;
-      })
+        setImagesLoading(false);
+      },
+      (err) => {
+        console.error("images listener error for", boardId, err);
+      }
     );
 
-    setlatestboardimages(newLatestImages);
-    setImagesLoading(false);
-  };
+    imagesUnsubsRef.current.set(boardId, unsub);
+  });
 
-  fetchBoardsWithImages();
-}, [user, selected]);
+  // 2) Remove listeners for boards no longer visible
+  imagesUnsubsRef.current.forEach((unsub, id) => {
+    if (!visibleBoardIds.includes(id)) {
+      unsub();
+      imagesUnsubsRef.current.delete(id);
+      // remove from state
+      setlatestboardimages((prev) => {
+        if (!prev[id]) return prev;
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+    }
+  });
+
+  // cleanup on unmount / dependency change
+  return () => {
+    // we don't tear down all listeners here if you want them to persist between filters.
+    // But on component unmount, clear everything:
+    // (React will call this effect's cleanup on dependency change too; this ensures we don't leak)
+    imagesUnsubsRef.current.forEach((unsub) => unsub());
+    imagesUnsubsRef.current.clear();
+  };
+}, [user, selected, boards]); // boards should be the state that the first useEffect sets
 
 
   const handleRename = (boardId, currentTitle) => {
