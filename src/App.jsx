@@ -16,24 +16,54 @@ export default function App() {
   const [selected, setSelected] = useState("My Boards");
   const [sidebarVisible, setSidebarVisible] = useState(false);
    const location = useLocation();
-  const isBoardPage = location.pathname.startsWith("/board/");
+   const navigate = useNavigate();
 
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
-  async function login() {
+  const isBoardPage = location.pathname.startsWith("/board/");
+  const [authLoading, setAuthLoading] = useState(true);
+
+ useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    setUser(firebaseUser);
+    setAuthLoading(false); // auth check is done
+  });
+  return () => unsubscribe();
+}, []);
+
+async function login() {
   const result = await signInWithPopup(auth, provider);
   const user = result.user;
 
   const userRef = doc(db, "users", user.uid);
-  await setDoc(userRef, {
-    displayName: user.displayName,
-    email: user.email,
-    photoURL: user.photoURL
-  }, { merge: true }); // merge:true so we don't overwrite if already exists
+  await setDoc(
+    userRef,
+    {
+      displayName: user.displayName,
+      email: user.email,
+      photoURL: user.photoURL,
+    },
+    { merge: true }
+  );
 }
-  //const login = () => signInWithPopup(auth, provider);
-  const navigate = useNavigate();
-  //also come out of board when logged out
-  const logout = async () => {
+
+function SplashScreen() {
+  return (
+    <div style={{
+      height: "600px",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center", // light background like Miro
+    }}>
+      <img 
+        src="/public/dragon.png" // replace with your logo
+        alt="App Logo"
+        className='dragon'
+        style={{ width: 80, height: 80, opacity: 0.9 }}
+      />
+    </div>
+  );
+}
+
+const logout = async () => {
   try {
     await signOut(auth);
     navigate("/");
@@ -42,12 +72,17 @@ export default function App() {
   }
 };
 
-  if (!user) return <LoginPage login={login}/>
+// Don't render anything until we know auth state
+if (authLoading) {
+  return  <SplashScreen />// or spinner
+}
+
+if (!user) return <LoginPage login={login} />;
 
  
 
   return (
-    <div style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
+    <div className="fade-in" style={{ margin: 0, padding: 0, bordersizing: "border-box" }}>
       {/* TOP Deep Teal HEADER */}
       {!isBoardPage && (
         <div
