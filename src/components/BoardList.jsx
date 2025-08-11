@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import {
   collection,
+  collectionGroup,
   query,
   where,
   getDocs,
+  getDoc,
   onSnapshot,
   orderBy,
   limit,
@@ -27,107 +29,188 @@ export default function BoardList({ user, selected }) {
   const menuRef = useRef();
 
   // Fetch boards list
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    const fetchBoards = async () => {
-      let q;
-      if (selected === "My Boards") {
-        q = query(
-          collection(db, "boards"),
-          where("ownerId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-      } else if (selected === "Shared with Me") {
-        q = query(
-          collection(db, "boards"),
-          where("sharedWith", "array-contains", user.uid),
-          orderBy("createdAt", "desc")
-        );
-      } else {
-        const ownedQuery = query(
-          collection(db, "boards"),
-          where("ownerId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        const sharedQuery = query(
-          collection(db, "boards"),
-          where("sharedWith", "array-contains", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        const [ownedSnap, sharedSnap] = await Promise.all([
-          getDocs(ownedQuery),
-          getDocs(sharedQuery),
-        ]);
-        setBoards([
-          ...ownedSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-          ...sharedSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        ]);
-        return;
-      }
+  let boardUnsub = null;
+  const collabUnsubs = new Map(); // to store unsubscribers for collaborators listeners
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setBoards(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  const startListening = () => {
+    // Main boards listener
+    boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
+      const tempBoards = [];
+
+      boardsSnap.forEach((boardDoc) => {
+        const boardData = { id: boardDoc.id, ...boardDoc.data() };
+
+        // My Boards → only owned by me
+        if (selected === "My Boards") {
+          if (boardData.ownerId === user.uid) {
+            tempBoards.push(boardData);
+          }
+        }
+
+        // Shared with Me → listen to collaborators
+        else if (selected === "Shared with Me") {
+          if (!collabUnsubs.has(boardDoc.id)) {
+            const unsub = onSnapshot(
+              collection(db, "boards", boardDoc.id, "collaborators"),
+              (collabSnap) => {
+                const isCollaborator = collabSnap.docs.some(
+                  (c) => c.id === user.uid && c.data().role !== "owner"
+                );
+                if (isCollaborator) {
+                  setBoards((prev) => {
+                    const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
+                    return [...withoutBoard, boardData].sort(
+                      (a, b) =>
+                        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+                    );
+                  });
+                } else {
+                  setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+                }
+              }
+            );
+            collabUnsubs.set(boardDoc.id, unsub);
+          }
+        }
+
+        // All Boards → owned by me OR in collaborators
+        else if (selected === "All Boards") {
+          if (boardData.ownerId === user.uid) {
+            tempBoards.push(boardData);
+          }
+          if (!collabUnsubs.has(boardDoc.id)) {
+            const unsub = onSnapshot(
+              collection(db, "boards", boardDoc.id, "collaborators"),
+              (collabSnap) => {
+                const isCollaborator = collabSnap.docs.some(
+                  (c) => c.id === user.uid
+                );
+                if (isCollaborator || boardData.ownerId === user.uid) {
+                  setBoards((prev) => {
+                    const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
+                    return [...withoutBoard, boardData].sort(
+                      (a, b) =>
+                        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+                    );
+                  });
+                } else {
+                  setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+                }
+              }
+            );
+            collabUnsubs.set(boardDoc.id, unsub);
+          }
+        }
       });
 
-      return () => unsubscribe();
-    };
+      // For My Boards, we can set all at once
+      if (selected === "My Boards") {
+        setBoards(tempBoards.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      }
+    });
+  };
 
-    fetchBoards();
-  }, [user, selected]);
+  startListening();
+
+  return () => {
+    if (boardUnsub) boardUnsub();
+    collabUnsubs.forEach((unsub) => unsub());
+  };
+}, [user, selected]);
+
+
 
   // Fetch latest 3 images for each board
   useEffect(() => {
-    if (!user) return;
+  if (!user) return;
 
-    const fetchBoardsWithImages = async () => {
-      setImagesLoading(true); // show skeletons while fetching
-      let boardsQuery;
-      if (selected === "My Boards") {
-        boardsQuery = query(
+  const fetchBoardsWithImages = async () => {
+    setImagesLoading(true); // show skeletons while fetching
+
+    let boards = [];
+
+    if (selected === "My Boards") {
+      // Boards owned by me
+      const ownedSnap = await getDocs(
+        query(
           collection(db, "boards"),
           where("ownerId", "==", user.uid),
           orderBy("createdAt", "desc")
-        );
-      } else if (selected === "Shared with Me") {
-        boardsQuery = query(
-          collection(db, "boards"),
-          where("sharedWith", "array-contains", user.uid),
-          orderBy("createdAt", "desc")
-        );
-      } else {
-        boardsQuery = query(
-          collection(db, "boards"),
-          orderBy("createdAt", "desc")
-        );
-      }
+        )
+      );
+      boards = ownedSnap.docs;
+    }
 
-      const boardsSnap = await getDocs(boardsQuery);
-      const newLatestImages = {};
+    else if (selected === "Shared with Me") {
+      // Get all boards where I'm in collaborators (not owner)
+      const allBoardsSnap = await getDocs(
+        query(collection(db, "boards"), orderBy("createdAt", "desc"))
+      );
 
-      await Promise.all(
-        boardsSnap.docs.map(async (docSnap) => {
-          const boardId = docSnap.id;
-          const imagesRef = collection(db, "boards", boardId, "images");
-          const imageQuery = query(
-            imagesRef,
-            orderBy("createdAt", "desc"),
-            limit(3)
+      // Filter by checking collaborators subcollection
+      const collabBoards = await Promise.all(
+        allBoardsSnap.docs.map(async (docSnap) => {
+          const collabDoc = await getDoc(
+            doc(db, "boards", docSnap.id, "collaborators", user.uid)
           );
-          const imageSnap = await getDocs(imageQuery);
-          const latestImages = imageSnap.docs.map(
-            (imgDoc) => imgDoc.data().src || ""
-          );
-          newLatestImages[boardId] = latestImages;
+          if (collabDoc.exists() && collabDoc.data().role !== "owner") {
+            return docSnap;
+          }
+          return null;
         })
       );
 
-      setlatestboardimages(newLatestImages);
-      setImagesLoading(false); // done loading
-    };
+      boards = collabBoards.filter(Boolean);
+    }
 
-    fetchBoardsWithImages();
-  }, [user, selected]);
+    else {
+      // All Boards = owned by me OR in collaborators
+      const allBoardsSnap = await getDocs(
+        query(collection(db, "boards"), orderBy("createdAt", "desc"))
+      );
+
+      const filteredBoards = await Promise.all(
+        allBoardsSnap.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          if (data.ownerId === user.uid) return docSnap;
+          const collabDoc = await getDoc(
+            doc(db, "boards", docSnap.id, "collaborators", user.uid)
+          );
+          if (collabDoc.exists()) return docSnap;
+          return null;
+        })
+      );
+
+      boards = filteredBoards.filter(Boolean);
+    }
+
+    // Fetch latest 3 images for each board
+    const newLatestImages = {};
+
+    await Promise.all(
+      boards.map(async (docSnap) => {
+        const boardId = docSnap.id;
+        const imagesRef = collection(db, "boards", boardId, "images");
+        const imageSnap = await getDocs(
+          query(imagesRef, orderBy("createdAt", "desc"), limit(3))
+        );
+        const latestImages = imageSnap.docs.map(
+          (imgDoc) => imgDoc.data().src || ""
+        );
+        newLatestImages[boardId] = latestImages;
+      })
+    );
+
+    setlatestboardimages(newLatestImages);
+    setImagesLoading(false);
+  };
+
+  fetchBoardsWithImages();
+}, [user, selected]);
+
 
   const handleRename = (boardId, currentTitle) => {
     const newTitle = prompt("Enter new title", currentTitle);
