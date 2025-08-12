@@ -40,16 +40,32 @@ export default function BoardPage({ user }) {
   // Long-press state for showing delete overlay on a particular image
   const [longPressedIndex, setLongPressedIndex] = useState(null);
   const longPressTimerRef = useRef(null);
-  const LONG_PRESS_MS = 400; // 300ms like Pinterest
+  const LONG_PRESS_MS = 400; // 400ms like Pinterest
 
   // Board menu (3-dots)
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+
+  // Board comments drawer
+  const [showBoardComments, setShowBoardComments] = useState(false);
+  const [boardComments, setBoardComments] = useState([]);
+  const [boardCommentsLoading, setBoardCommentsLoading] = useState(false);
+  const [boardCommentText, setBoardCommentText] = useState('');
+  const [boardCommentNotify, setBoardCommentNotify] = useState(false);
+
+  // Image comments modal (separate modal opened from the image viewer)
+  const [showImageCommentsModal, setShowImageCommentsModal] = useState(false);
+  const [imageComments, setImageComments] = useState([]);
+  const [imageCommentsLoading, setImageCommentsLoading] = useState(false);
+  const [imageCommentText, setImageCommentText] = useState('');
+  const [imageCommentNotify, setImageCommentNotify] = useState(false);
 
   // store a short 'last opened' string
   const [lastOpenedShort, setLastOpenedShort] = useState('');
 
   // put once in the component body (used by other effects sometimes)
   const imagesUnsubRef = useRef(null);
+  const boardCommentsUnsubRef = useRef(null);
+  const imageCommentsUnsubRef = useRef(null);
 
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
@@ -58,35 +74,35 @@ export default function BoardPage({ user }) {
   };
 
   const handleBack = () => {
-  // 1) prefer explicit from-state (set when linking)
-  if (location.state && location.state.from) {
-    navigate(location.state.from);
-    return;
-  }
-
-  // 2) if there's history, go back
-  if (window.history.length > 1) {
-    navigate(-1);
-    return;
-  }
-
-  // 3) if referrer is same-origin (safer than blindly trusting it)
-  try {
-    if (document.referrer) {
-      const ref = new URL(document.referrer);
-      if (ref.origin === window.location.origin) {
-        // go to referrer path
-        navigate(-1); // safe: browser will go back to referrer
-        return;
-      }
+    // 1) prefer explicit from-state (set when linking)
+    if (location.state && location.state.from) {
+      navigate(location.state.from);
+      return;
     }
-  } catch (err) {
-    // fallthrough to fallback
-  }
 
-  // 4) final fallback
-  navigate('/');
-};
+    // 2) if there's history, go back
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    // 3) if referrer is same-origin (safer than blindly trusting it)
+    try {
+      if (document.referrer) {
+        const ref = new URL(document.referrer);
+        if (ref.origin === window.location.origin) {
+          // go to referrer path
+          navigate(-1); // safe: browser will go back to referrer
+          return;
+        }
+      }
+    } catch (err) {
+      // fallthrough to fallback
+    }
+
+    // 4) final fallback
+    navigate('/');
+  };
 
   // -------------------- collaborators UIDs --------------------
   useEffect(() => {
@@ -114,7 +130,6 @@ export default function BoardPage({ user }) {
         await updateDoc(boardRef, { lastOpenedAt: serverTimestamp() });
       } catch (err) {
         // ignore if user can't write
-        // console.warn('Could not update lastOpenedAt', err);
       }
     }
 
@@ -182,9 +197,6 @@ export default function BoardPage({ user }) {
     }
 
     fetchCollaboratorProfiles();
-    // debug logs
-    // console.log('collaboratorUIDs', collaboratorUIDs);
-    // console.log('collaborators:', collaborators);
   }, [collaboratorUIDs]);
 
   // -------------------- realtime images subscription --------------------
@@ -261,6 +273,147 @@ export default function BoardPage({ user }) {
     const days = Math.round(hours / 24);
     return `${days}d`;
   }
+
+  // -------------------- board comments realtime --------------------
+  useEffect(() => {
+    if (!boardId) return;
+    setBoardCommentsLoading(true);
+    const q = query(collection(db, 'boards', boardId, 'comments'), orderBy('createdAt', 'asc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setBoardComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setBoardCommentsLoading(false);
+      },
+      (err) => {
+        console.error('board comments listener error', err);
+        setBoardCommentsLoading(false);
+      }
+    );
+    boardCommentsUnsubRef.current = unsubscribe;
+    return () => {
+      if (unsubscribe) unsubscribe();
+      boardCommentsUnsubRef.current = null;
+    };
+  }, [boardId]);
+
+  // -------------------- image comments subscription when modal opens --------------------
+  useEffect(() => {
+    // cleanup previous
+    if (imageCommentsUnsubRef.current) {
+      imageCommentsUnsubRef.current();
+      imageCommentsUnsubRef.current = null;
+    }
+
+    if (modalIndex === null) {
+      setImageComments([]);
+      return;
+    }
+
+    const image = images[modalIndex];
+    if (!image) return;
+
+    setImageCommentsLoading(true);
+    const q = query(collection(db, 'boards', boardId, 'images', image.id, 'comments'), orderBy('createdAt', 'asc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setImageComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setImageCommentsLoading(false);
+      },
+      (err) => {
+        console.error('image comments listener error', err);
+        setImageCommentsLoading(false);
+      }
+    );
+
+    imageCommentsUnsubRef.current = unsubscribe;
+    return () => {
+      if (unsubscribe) unsubscribe();
+      imageCommentsUnsubRef.current = null;
+    };
+  }, [modalIndex, images, boardId]);
+
+  // -------------------- helper: create notifications --------------------
+  const createNotificationsForUsers = async (uids, payload) => {
+    try {
+      // write a notification doc for each user
+      await Promise.all(
+        uids.map((uid) => addDoc(collection(db, 'users', uid, 'notifications'), {
+          ...payload,
+          read: false,
+          createdAt: serverTimestamp(),
+        }))
+      );
+    } catch (err) {
+      console.error('createNotificationsForUsers error', err);
+    }
+  };
+
+  // -------------------- commenting actions --------------------
+  const postBoardComment = async () => {
+    if (!boardCommentText.trim()) return;
+    const commentRef = collection(db, 'boards', boardId, 'comments');
+    const payload = {
+      text: boardCommentText.trim(),
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+      await addDoc(commentRef, payload);
+      setBoardCommentText('');
+      showToast('Comment posted', 'success', 2000);
+
+      if (boardCommentNotify) {
+        const targets = collaboratorUIDs.filter((id) => id !== user.uid);
+        createNotificationsForUsers(targets, {
+          type: 'board_comment',
+          boardId,
+          text: payload.text,
+          actor: user.uid,
+          url: `/board/${boardId}`,
+        });
+      }
+    } catch (err) {
+      console.error('postBoardComment error', err);
+      showToast('Could not post comment', 'error', 2500);
+    }
+  };
+
+  const postImageComment = async () => {
+    if (!imageCommentText.trim() || modalIndex === null) return;
+    const image = images[modalIndex];
+    if (!image) return;
+
+    const commentRef = collection(db, 'boards', boardId, 'images', image.id, 'comments');
+    const payload = {
+      text: imageCommentText.trim(),
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+      await addDoc(commentRef, payload);
+      setImageCommentText('');
+      showToast('Comment posted', 'success', 2000);
+
+      if (imageCommentNotify) {
+        const targets = collaboratorUIDs.filter((id) => id !== user.uid);
+        createNotificationsForUsers(targets, {
+          type: 'image_comment',
+          boardId,
+          imageId: image.id,
+          text: payload.text,
+          actor: user.uid,
+          url: `/board/${boardId}?image=${image.id}`,
+        });
+      }
+    } catch (err) {
+      console.error('postImageComment error', err);
+      showToast('Could not post comment', 'error', 2500);
+    }
+  };
 
   // -------------------- image saving / paste handling (unchanged mostly) --------------------
   const saveImageToFirestore = async (src) => {
@@ -400,7 +553,6 @@ export default function BoardPage({ user }) {
 
     try {
       // delete subcollections (images + collaborators) then the board doc
-      // NOTE: recursive collection deletion isn't provided on client SDK — this loops and deletes each doc.
       const imagesSnap = await getDocs(collection(db, 'boards', boardIdParam, 'images'));
       await Promise.all(imagesSnap.docs.map((d) => deleteDoc(doc(db, 'boards', boardIdParam, 'images', d.id))));
 
@@ -428,20 +580,25 @@ export default function BoardPage({ user }) {
       } else if (e.key === 'ArrowRight') {
         setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
       } else if (e.key === 'Escape') {
-        setModalIndex(null);
+        // close comments modal first if open
+        if (showImageCommentsModal) {
+          setShowImageCommentsModal(false);
+        } else {
+          setModalIndex(null);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modalIndex, images.length]);
+  }, [modalIndex, images.length, showImageCommentsModal]);
 
   // -------------------- debug / logging --------------------
   useEffect(() => {
     // console.log('collaboratorprofiels:', collaboratorProfiles);
   }, [boardId, collaboratorProfiles]);
 
-const menuRef = useRef(null);
+  const menuRef = useRef(null);
   // Close menu on outside click
   useEffect(() => {
     function handleClickOutside(event) {
@@ -451,263 +608,125 @@ const menuRef = useRef(null);
     }
 
     if (showBoardMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     } else {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showBoardMenu]);
 
+  // when the modal closes, also ensure comments modal is closed
+  useEffect(() => {
+    if (modalIndex === null) setShowImageCommentsModal(false);
+  }, [modalIndex]);
+
   return (
-    <div style={{ marginTop: "0px" }}>
+<div style={{ marginTop: '0px' }}>
       {/* boardpage HEADER kinda */}
-      <div style={{display:"flex", justifyContent:"space-between", margin:"0px"}}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
         <button
-        onClick={handleBack}
-        aria-label="Back"
-        style={{
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          padding: 1,
-          marginRight: 8,
-          display: "inline-flex",
-          alignItems: "center",
-          outline: "none",
-        }}
-      >
-        {/* simple left arrow */}
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#333"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          onClick={handleBack}
+          aria-label="Back"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 1,
+            marginRight: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            outline: 'none',
+          }}
         >
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
-      {/* 3-dots menu button */}
-        <div style={{ position: "relative" }} ref={menuRef}>
+          {/* simple left arrow */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* comments toggle */}
           <button
-            aria-label="Board menu"
-            onClick={() => setShowBoardMenu((s) => !s)}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 8,
-              marginTop: 8,
-              outline: "none",
-            }}
+            aria-label="Board comments"
+            onClick={() => setShowBoardComments((s) => !s)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, outline: 'none' }}
           >
-            {/* simple 3 dot icon */}
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#333"
-              strokeWidth="2"
-            >
-              <circle cx="5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="19" cy="12" r="1.6" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </button>
 
-          {showBoardMenu && (
-            <div
-              role="menu"
+          {/* 3-dots menu button */}
+          <div style={{ position: 'relative' }} ref={menuRef}>
+            <button
+              aria-label="Board menu"
+              onClick={() => setShowBoardMenu((s) => !s)}
               style={{
-                position: "absolute",
-                right: 0,
-                top: "36px",
-                minWidth: 160,
-                background: "#fff",
-                borderRadius: 8,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
                 padding: 8,
-                zIndex: 120,
+                marginTop: 8,
+                outline: 'none',
               }}
             >
-              <button
-                onClick={() => handleRename(boardId, boardTitle)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: 8,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                Rename
-              </button>
-              <button
-                onClick={() => handleDeleteBoard(boardId)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: 8,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "#b82b2b",
-                }}
-              >
-                Delete board
-              </button>
-            </div>
-          )}
+              {/* simple 3 dot icon */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+            </button>
+
+            {showBoardMenu && (
+              <div role="menu" style={{ position: 'absolute', right: 0, top: '36px', minWidth: 160, background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, zIndex: 120 }}>
+                <button onClick={() => handleRename(boardId, boardTitle)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                  Rename
+                </button>
+                <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>
+                  Delete board
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* h2, picks, last opened */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginLeft: "8px",
-        }}
-      >
-        <h2
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            userSelect: "none",
-            margin: 0,
-            lineHeight: 1.06,
-            marginBottom: "10px",
-          }}
-        >
-          {boardTitle}{" "}
-          <span style={{ fontSize: "0.9rem", color: "#888", marginTop: "9px" }}>
-            {images.length} {images.length === 1 ? "pick" : "picks"}{" "}
-            <span style={{ margin: "0 6px" }}>·</span> {lastOpenedShort}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginLeft: '8px' }}>
+        <h2 style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', userSelect: 'none', margin: 0, lineHeight: 1.06, marginBottom: '10px' }}>
+          {boardTitle}{' '}
+          <span style={{ fontSize: '0.9rem', color: '#888', marginTop: '9px' }}>
+            {images.length} {images.length === 1 ? 'pick' : 'picks'} <span style={{ margin: '0 6px' }}>·</span> {lastOpenedShort}
           </span>
         </h2>
 
-        
       </div>
 
       {/* Collaborators */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0px",
-          marginTop: "6px",
-          marginBottom: "12px",
-          position: "relative",
-          marginLeft: "8px",
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }}>
         {collaboratorProfiles.map((profile, i) => (
-          <img
-            key={profile.uid}
-            src={profile.photoURL}
-            alt={profile.displayName}
-            title={`${profile.displayName} (${profile.uid})`}
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              border: "2px solid white",
-              objectFit: "cover",
-              transform: `translateX(-${i * 10}px)`,
-              zIndex: collaboratorProfiles.length - i,
-            }}
-          />
+          <img key={profile.uid} src={profile.photoURL} alt={profile.displayName} title={`${profile.displayName} (${profile.uid})`} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', objectFit: 'cover', transform: `translateX(-${i * 10}px)`, zIndex: collaboratorProfiles.length - i }} />
         ))}
       </div>
 
       {/* Paste box */}
-      <textarea
-        ref={pasteRef}
-        placeholder="Long press and tap Paste"
-        onPaste={handlePaste}
-        rows={2}
-        style={{
-          display: "block",
-          width: "100%",
-          height: "45px",
-          border: "2px dashed #4caf50",
-          background: "#eaffea",
-          fontSize: "16px",
-          marginBottom: "16px",
-          padding: "10px",
-          borderRadius: "8px",
-          boxSizing: "border-box",
-        }}
-      />
+      <textarea ref={pasteRef} placeholder="Long press and tap Paste" onPaste={handlePaste} rows={2} style={{ display: 'block', width: '100%', height: '45px', border: '2px dashed #4caf50', background: '#eaffea', fontSize: '16px', marginBottom: '16px', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
 
-      {/* Images grid */}
-      <div
-        className="image-container"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "12px",
-          justifyContent: "space-between",
-        }}
-      >
+      {/* Images grid - container click clears long-press mode (tap outside to cancel) */}
+      <div className="image-container" onClick={() => setLongPressedIndex(null)} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between' }}>
         {imagesLoading ? (
           Array.from({ length: 6 }).map((_, idx) => (
-            <div
-              key={`skeleton-${idx}`}
-              style={{
-                flex: "0 1 calc(50% - 6px)",
-                background: "transparent",
-                borderRadius: "8px",
-                boxShadow: "0 2px 5px rgba(0,0,0,0.06)",
-                padding: 10,
-              }}
-            >
-              <div
-                className="skeleton-dark rect"
-                style={{ height: 160, borderRadius: 8 }}
-              />
+            <div key={`skeleton-${idx}`} style={{ flex: '0 1 calc(50% - 6px)', background: 'transparent', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.06)', padding: 10 }}>
+              <div className="skeleton-dark rect" style={{ height: 160, borderRadius: 8 }} />
             </div>
           ))
         ) : images.length === 0 ? (
-          <div
-            style={{
-              flex: "1 1 100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "40px 20px",
-              borderRadius: "8px",
-              background: "#f9fafb",
-              color: "#666",
-              fontStyle: "italic",
-              textAlign: "center",
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="36"
-              height="36"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#bbb"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ marginBottom: "8px" }}
-            >
+          <div style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', borderRadius: '8px', background: '#f9fafb', color: '#666', fontStyle: 'italic', textAlign: 'center' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
               <circle cx="12" cy="12" r="10" />
               <line x1="8" y1="15" x2="16" y2="15" />
               <line x1="9" y1="9" x2="9.01" y2="9" />
@@ -717,282 +736,161 @@ const menuRef = useRef(null);
           </div>
         ) : (
           images.map((img, i) => (
-            <div
-              key={img.id}
-              onMouseDown={() => startLongPress(i)}
-              onMouseUp={() => cancelLongPress()}
-              onMouseLeave={() => cancelLongPress()}
-              onTouchStart={() => startLongPress(i)}
-              onTouchEnd={() => cancelLongPress()}
-              onTouchCancel={() => cancelLongPress()}
-              style={{
-                flex: "0 1 calc(50% - 6px)",
-                background: longPressedIndex === i ? "#fff" : "white", // ensure white bg when long-pressing
-                borderRadius: "8px",
-                boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                overflow: "hidden",
-                position: "relative",
-              }}
-            >
-              {/* Image itself; if longPress mode for this image is active, don't open modal on click */}
-              <img
-                src={img.src}
-                alt="pasted"
-                style={{
-                  width: "100%",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  display: "block",
-                }}
-                onClick={() => {
-                  if (longPressedIndex !== null) return; // ignore click when in long-press mode
-                  setModalIndex(i);
-                }}
-              />
+            <div key={img.id} onMouseDown={() => startLongPress(i)} onMouseUp={() => cancelLongPress()} onMouseLeave={() => cancelLongPress()} onTouchStart={() => startLongPress(i)} onTouchEnd={() => cancelLongPress()} onTouchCancel={() => cancelLongPress()} style={{ flex: '0 1 calc(50% - 6px)', background: longPressedIndex === i ? '#fff' : 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' }}>
+              {/* stop container click from immediately closing long-press when interacting with image */}
+              <div onClick={(e) => e.stopPropagation()}>
+                {/* Image itself; if longPress mode for this image is active, don't open modal on click */}
+                <img src={img.src} alt="pasted" style={{ width: '100%', borderRadius: '6px', cursor: 'pointer', display: 'block' }} onClick={(e) => { e.stopPropagation(); if (longPressedIndex !== null) return; setModalIndex(i); }} />
 
-              {/* long-press overlay with trash icon */}
-              {longPressedIndex === i && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "rgba(255,255,255,0.9)",
-                    zIndex: 40,
-                  }}
-                >
-                  <button
-                    onClick={() => handleDeleteImage(img.id, i)}
-                    aria-label="Delete pick"
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 12,
-                      display: "grid",
-                      placeItems: "center",
-                      border: "none",
-                      cursor: "pointer",
-                      background: "linear-gradient(180deg,#fff,#f6f6f6)",
-                      boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                    }}
-                  >
-                    {/* trash svg */}
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      fill="currentColor"
-                      class="bi bi-trash"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
-                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+                {/* long-press overlay with trash icon */}
+                {longPressedIndex === i && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.9)', zIndex: 40 }}>
+                    <button onClick={() => handleDeleteImage(img.id, i)} aria-label="Delete pick" style={{ width: 56, height: 56, borderRadius: 12, display: 'grid', placeItems: 'center', border: 'none', cursor: 'pointer', background: 'linear-gradient(180deg,#fff,#f6f6f6)', boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
+                      {/* trash svg */}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-trash" viewBox="0 0 16 16">
+                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
+                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal (image viewer) - click overlay to close, click image to close as before */}
       {modalIndex !== null && (
-        <div
-          onClick={() => setModalIndex(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            zIndex: 999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0].clientX;
-          }}
-          onTouchMove={(e) => {
-            touchEndX.current = e.touches[0].clientX;
-          }}
-          onTouchEnd={() => {
-            if (touchStartX.current !== null && touchEndX.current !== null) {
-              const delta = touchEndX.current - touchStartX.current;
-              const threshold = 50;
-              if (delta > threshold)
-                setModalIndex((prev) =>
-                  prev === 0 ? images.length - 1 : prev - 1
-                );
-              else if (delta < -threshold)
-                setModalIndex((prev) =>
-                  prev === images.length - 1 ? 0 : prev + 1
-                );
-            }
-            touchStartX.current = null;
-            touchEndX.current = null;
-          }}
-        >
-          <img
-            src={images[modalIndex]?.src}
-            alt="Full view"
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: "8px",
-              boxShadow: "0 0 20px rgba(0,0,0,0.4)",
-              transition: "transform 0.3s ease",
-            }}
-          />
+        <div onClick={() => setModalIndex(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }} onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }} onTouchMove={(e) => { touchEndX.current = e.touches[0].clientX; }} onTouchEnd={() => { if (touchStartX.current !== null && touchEndX.current !== null) { const delta = touchEndX.current - touchStartX.current; const threshold = 50; if (delta > threshold) setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1)); else if (delta < -threshold) setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1)); } touchStartX.current = null; touchEndX.current = null; }}>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }} onClick={(e) => e.stopPropagation()}>
+            <img src={images[modalIndex]?.src} alt="Full view" style={{ maxWidth: '90%', maxHeight: '70vh', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.4)', transition: 'transform 0.3s ease', cursor: 'pointer' }} onClick={() => { if (!showImageCommentsModal) setModalIndex(null); }} />
+
+            {/* small comments button - opens the comments modal */}
+            <button onClick={() => setShowImageCommentsModal(true)} style={{ position: 'absolute', right: '6vw', bottom: '20vh', width: 44, height: 44, borderRadius: 10, border: 'none', background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.18)', display: 'grid', placeItems: 'center', cursor: 'pointer', zIndex: 1000 }} aria-label="Open comments">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Image Comments Modal - opens on top of image viewer */}
+          {showImageCommentsModal && (
+            <div style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div onClick={() => setShowImageCommentsModal(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+
+              <div style={{ width: '92vw', maxWidth: 720, maxHeight: '80vh', background: '#fff', borderRadius: 10, padding: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', zIndex: 1201 }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong>Comments</strong>
+                  <button onClick={() => setShowImageCommentsModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>Close</button>
+                </div>
+
+                <div style={{ overflowY: 'auto', flex: 1, paddingRight: 6 }}>
+                  {imageCommentsLoading ? (
+                    <div>Loading comments…</div>
+                  ) : imageComments.length === 0 ? (
+                    <div style={{ color: '#666', fontStyle: 'italic' }}>No comments yet.</div>
+                  ) : (
+                    imageComments.map((c) => (
+                      <div key={c.id} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', flexShrink: 0 }}>
+                          <img src={(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).photoURL} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).displayName || c.createdBy}</div>
+                          <div style={{ fontSize: 13 }}>{c.text}</div>
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{timeAgoShort(c.createdAt)}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* fixed input area */}
+                <div style={{ marginTop: 8, borderTop: '1px solid #eee', paddingTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={imageCommentText} onChange={(e) => setImageCommentText(e.target.value)} placeholder="Write a comment…" style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #eee' }} />
+                  <button onClick={postImageComment} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, color: '#666' }}>
+                  <input type="checkbox" checked={imageCommentNotify} onChange={(e) => setImageCommentNotify(e.target.checked)} /> Notify friends
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Board comments drawer (slides from right) */}
+      {showBoardComments && (
+        <div style={{ position: 'fixed', right: 0, top: 0, height: '100vh', width: 420, maxWidth: '100%', background: '#fff', zIndex: 1100, boxShadow: '0 10px 40px rgba(0,0,0,0.2)', padding: 16, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <strong>Board comments</strong>
+            <button onClick={() => setShowBoardComments(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>Close</button>
+          </div>
+
+          <div style={{ overflowY: 'auto', flex: 1, paddingRight: 6 }}>
+            {boardCommentsLoading ? (
+              <div>Loading…</div>
+            ) : boardComments.length === 0 ? (
+              <div style={{ color: '#666', fontStyle: 'italic' }}>No comments yet.</div>
+            ) : (
+              boardComments.map((c) => (
+                <div key={c.id} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', flexShrink: 0 }}>
+                    <img src={(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).photoURL} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).displayName || c.createdBy}</div>
+                    <div style={{ fontSize: 13 }}>{c.text}</div>
+                    <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{timeAgoShort(c.createdAt)}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ marginTop: 8, borderTop: '1px solid #eee', paddingTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={boardCommentText} onChange={(e) => setBoardCommentText(e.target.value)} placeholder="Write a comment…" style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #eee' }} />
+              <button onClick={postBoardComment} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, color: '#666' }}>
+              <input type="checkbox" checked={boardCommentNotify} onChange={(e) => setBoardCommentNotify(e.target.checked)} /> Notify friends
+            </label>
+          </div>
+        </div>
+      )}
+
+
       {/* Toast */}
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "84px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1200,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            pointerEvents: "auto",
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              padding: "12px 14px",
-              minWidth: 220,
-              maxWidth: 420,
-              borderRadius: 12,
-              boxShadow: "0 10px 30px rgba(8,10,20,0.35)",
-              color: "#fff",
-              background:
-                toast.type === "error"
-                  ? "linear-gradient(180deg,#6f1f1f,#5b1515)"
-                  : toast.type === "success"
-                  ? "linear-gradient(180deg,#1b7a2b,#16621f)"
-                  : "linear-gradient(180deg,#2b5fa8,#1b4aa0)",
-            }}
-          >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 10,
-                display: "grid",
-                placeItems: "center",
-                background: "rgba(255,255,255,0.06)",
-                flexShrink: 0,
-              }}
-            >
-              {toast.type === "success" ? (
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  aria-hidden
-                >
-                  <path
-                    d="M20 6L9 17l-5-5"
-                    stroke="#e6ffef"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+        <div style={{ position: 'fixed', bottom: '84px', left: '50%', transform: 'translateX(-50%)', zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'auto' }} role="status" aria-live="polite">
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', minWidth: 220, maxWidth: 420, borderRadius: 12, boxShadow: '0 10px 30px rgba(8,10,20,0.35)', color: '#fff', background: toast.type === 'error' ? 'linear-gradient(180deg,#6f1f1f,#5b1515)' : toast.type === 'success' ? 'linear-gradient(180deg,#1b7a2b,#16621f)' : 'linear-gradient(180deg,#2b5fa8,#1b4aa0)' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }}>
+              {toast.type === 'success' ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M20 6L9 17l-5-5" stroke="#e6ffef" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              ) : toast.type === "error" ? (
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  aria-hidden
-                >
-                  <path
-                    d="M18 6L6 18M6 6l12 12"
-                    stroke="#ffdede"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+              ) : toast.type === 'error' ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M18 6L6 18M6 6l12 12" stroke="#ffdede" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               ) : (
-                <div
-                  style={{
-                    width: 18,
-                    height: 18,
-                    border: "2px solid rgba(255,255,255,0.35)",
-                    borderTopColor: "#fff",
-                    borderRadius: "50%",
-                    animation: "spin 1s linear infinite",
-                  }}
-                />
+                <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               )}
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{ fontWeight: 700, fontSize: 14, lineHeight: "1.05" }}
-              >
-                {toast.msg}
-              </div>
+              <div style={{ fontWeight: 700, fontSize: 14, lineHeight: '1.05' }}>{toast.msg}</div>
             </div>
 
-            <button
-              onClick={() => setToast(null)}
-              aria-label="Dismiss"
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "rgba(255,255,255,0.9)",
-                cursor: "pointer",
-                fontSize: 16,
-                padding: 8,
-                marginLeft: 8,
-              }}
-            >
-              ×
-            </button>
+            <button onClick={() => setToast(null)} aria-label="Dismiss" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 16, padding: 8, marginLeft: 8 }}>×</button>
           </div>
 
-          {toast.type === "info" && (
-            <div
-              style={{
-                height: 6,
-                width: "100%",
-                maxWidth: 420,
-                borderRadius: 6,
-                overflow: "hidden",
-                background: "rgba(255,255,255,0.08)",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: "100%",
-                  background: "linear-gradient(90deg,#ffffff80,#ffffff40)",
-                  transformOrigin: "left",
-                  animation: `toast-progress ${
-                    toast.duration || 20000
-                  }ms linear forwards`,
-                }}
-              />
+          {toast.type === 'info' && (
+            <div style={{ height: 6, width: '100%', maxWidth: 420, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
+              <div style={{ height: '100%', width: '100%', background: 'linear-gradient(90deg,#ffffff80,#ffffff40)', transformOrigin: 'left', animation: `toast-progress ${toast.duration || 20000}ms linear forwards` }} />
             </div>
           )}
 
