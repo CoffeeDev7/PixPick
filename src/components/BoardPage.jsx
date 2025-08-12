@@ -15,6 +15,8 @@ import {
   updateDoc,
   deleteDoc,
   limit,
+  setDoc,
+  where,
 } from 'firebase/firestore';
 
 export default function BoardPage({ user }) {
@@ -49,11 +51,73 @@ export default function BoardPage({ user }) {
   // put once in the component body (used by other effects sometimes)
   const imagesUnsubRef = useRef(null);
 
+  // Comments modal state (image-level)
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [commentList, setCommentList] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const commentsUnsubRef = useRef(null);
+
+  // board-level comments (small button beside 3-dots)
+  const [boardCommentModalOpen, setBoardCommentModalOpen] = useState(false);
+  const [boardCommentList, setBoardCommentList] = useState([]);
+  const [boardCommentText, setBoardCommentText] = useState('');
+  const boardCommentsUnsubRef = useRef(null);
+  const [boardCommentsCount, setBoardCommentsCount] = useState(0);
+
+  // per-image comment counts map { imageId: number }
+  const [commentCounts, setCommentCounts] = useState({});
+  const commentCountsUnsubsRef = useRef(new Map());
+
+  // short "last opened" string
+  const [lastOpenedShort, setLastOpenedShort] = useState('');
+
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
     setToast({ msg, type, duration });
     setTimeout(() => setToast(null), duration);
   };
+
+  // -------------------- small helpers --------------------
+  function timeAgoShort(ts) {
+    if (!ts) return '';
+    let ms = 0;
+    if (ts.toDate) ms = ts.toDate().getTime();
+    else if (ts.seconds) ms = ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+    else if (typeof ts === 'number') ms = ts;
+    else if (ts instanceof Date) ms = ts.getTime();
+    else return '';
+
+    const diff = Date.now() - ms;
+    const mins = Math.round(diff / (1000 * 60));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.round(hours / 24);
+    return `${days}d`;
+  }
+
+  async function getProfileCached(uid) {
+    try {
+      const TTL = 1000 * 60 * 60 * 24; // 24h
+      const now = Date.now();
+      const raw = localStorage.getItem(`profile_${uid}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed._cachedAt && now - parsed._cachedAt < TTL) {
+          return parsed.data;
+        }
+      }
+      const snap = await getDoc(doc(db, 'users', uid));
+      const data = snap.exists() ? snap.data() : { displayName: 'Unknown', photoURL: '' };
+      const toStore = { displayName: data.displayName || 'Unknown', photoURL: data.photoURL || '' };
+      localStorage.setItem(`profile_${uid}`, JSON.stringify({ _cachedAt: now, data: toStore }));
+      return toStore;
+    } catch (err) {
+      console.error('getProfileCached err', err);
+      return { displayName: 'Unknown', photoURL: '' };
+    }
+  }
 
   const handleBack = () => {
     if (location.state && location.state.from) {
@@ -193,6 +257,60 @@ export default function BoardPage({ user }) {
     };
   }, [boardId]);
 
+  // -------------------- per-image realtime comment counts --------------------
+  useEffect(() => {
+    if (!boardId) return;
+    const map = commentCountsUnsubsRef.current;
+
+    // add listeners for new images
+    images.forEach((img) => {
+      if (map.has(img.id)) return;
+      const commentsRef = collection(db, 'boards', boardId, 'images', img.id, 'comments');
+      const unsub = onSnapshot(commentsRef, (snap) => {
+        setCommentCounts((prev) => ({ ...prev, [img.id]: snap.size }));
+      });
+      map.set(img.id, unsub);
+    });
+
+    // remove listeners for images that no longer exist
+    const existingIds = new Set(images.map((i) => i.id));
+    for (const [id, unsub] of Array.from(map.entries())) {
+      if (!existingIds.has(id)) {
+        unsub();
+        map.delete(id);
+        setCommentCounts((prev) => {
+          const copy = { ...prev };
+          delete copy[id];
+          return copy;
+        });
+      }
+    }
+
+    return () => {
+      // cleanup all listeners on unmount
+      // (do not clear cache here)
+      // we'll keep map listeners until component unmounts
+    };
+  }, [images, boardId]);
+
+  // cleanup comment count listeners on unmount
+  useEffect(() => {
+    return () => {
+      commentCountsUnsubsRef.current.forEach((unsub) => unsub());
+      commentCountsUnsubsRef.current.clear();
+    };
+  }, []);
+
+  // -------------------- board comments count + subscription helper --------------------
+  useEffect(() => {
+    if (!boardId) return;
+    const ref = collection(db, 'boards', boardId, 'comments');
+    const unsub = onSnapshot(ref, (snap) => {
+      setBoardCommentsCount(snap.size);
+    });
+    return () => unsub();
+  }, [boardId]);
+
   // -------------------- fetch board title + lastOpened short --------------------
   useEffect(() => {
     const fetchBoardTitle = async () => {
@@ -202,6 +320,8 @@ export default function BoardPage({ user }) {
       if (boardSnap.exists()) {
         const data = boardSnap.data();
         setBoardTitle(data.title || '(Untitled)');
+        const ts = data.lastOpenedAt || data.updatedAt || data.createdAt || null;
+        setLastOpenedShort(timeAgoShort(ts));
       } else {
         setBoardTitle('(Board not found)');
       }
@@ -212,17 +332,14 @@ export default function BoardPage({ user }) {
 
   // -------------------- deep-link: open image modal when ?image=<id> present --------------------
   useEffect(() => {
-    // if there's ?image=... in URL, open that image in modal once images have loaded
     const params = new URLSearchParams(location.search);
     const imageId = params.get('image');
     if (!imageId) return;
 
-    // if images already loaded, try to open immediately
     if (images && images.length > 0) {
       const idx = images.findIndex((img) => img.id === imageId);
       if (idx !== -1) {
         setModalIndex(idx);
-        // remove the query param from URL (so re-opening doesn't keep it)
         try {
           const url = new URL(window.location.href);
           url.searchParams.delete('image');
@@ -231,8 +348,6 @@ export default function BoardPage({ user }) {
         return;
       }
     }
-
-    // otherwise, wait until images change (effect dependency covers it)
   }, [location.search, images]);
 
   // -------------------- image saving / paste handling (unchanged) --------------------
@@ -261,8 +376,6 @@ export default function BoardPage({ user }) {
 
       showToast('Image uploaded', 'success', 3500);
 
-      // OPTIONAL: create a notification for collaborators (deep-link includes image id so opening will show modal)
-      // createNotificationsForUsers is assumed to be a helper you have — implement server-side fan-out when scaling.
       try {
         const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
         const uids = collabSnap.docs.map(d => d.id).filter(Boolean);
@@ -275,10 +388,8 @@ export default function BoardPage({ user }) {
           actor: user.uid,
           url: `/board/${boardId}?image=${docRef.id}`,
         };
-        // write one notif doc per user under users/{uid}/notifications (naive fan-out)
         await Promise.all(uids.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
       } catch (err) {
-        // ignore; best to do this server-side in Cloud Functions for scale
         console.warn('Could not create notifications for collaborators', err);
       }
 
@@ -329,6 +440,97 @@ export default function BoardPage({ user }) {
     event.target.value = '';
   };
 
+  // -------------------- comments handling --------------------
+  // open comments modal for a specific image (by index)
+  const openCommentsForIndex = (index) => {
+    const image = images[index];
+    if (!image) return;
+    setCommentModalOpen(true);
+
+    const commentsRef = collection(db, 'boards', boardId, 'images', image.id, 'comments');
+    const q = query(commentsRef, orderBy('createdAt', 'desc'), limit(200));
+    if (commentsUnsubRef.current) commentsUnsubRef.current();
+    commentsUnsubRef.current = onSnapshot(q, async (snap) => {
+      const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // enrich with creator profile (displayName + photoURL)
+      const enriched = await Promise.all(raw.map(async (c) => {
+        const prof = await getProfileCached(c.createdBy);
+        return { ...c, creatorName: prof.displayName, creatorPhoto: prof.photoURL };
+      }));
+      setCommentList(enriched);
+    });
+  };
+
+  const closeComments = () => {
+    setCommentModalOpen(false);
+    setCommentText('');
+    setCommentList([]);
+    if (commentsUnsubRef.current) {
+      commentsUnsubRef.current();
+      commentsUnsubRef.current = null;
+    }
+  };
+
+  const postComment = async () => {
+    if (!commentText.trim()) return;
+    const image = images[modalIndex];
+    if (!image) return;
+    try {
+      await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
+        text: commentText.trim(),
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      setCommentText('');
+      showToast('Comment posted', 'success', 2000);
+    } catch (err) {
+      console.error('post comment error', err);
+      showToast('Could not post comment', 'error', 3000);
+    }
+  };
+
+  // -------------------- board-level comments modal --------------------
+  const openBoardComments = () => {
+    setBoardCommentModalOpen(true);
+    const ref = collection(db, 'boards', boardId, 'comments');
+    const q = query(ref, orderBy('createdAt', 'desc'), limit(200));
+    if (boardCommentsUnsubRef.current) boardCommentsUnsubRef.current();
+    boardCommentsUnsubRef.current = onSnapshot(q, async (snap) => {
+      const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const enriched = await Promise.all(raw.map(async (c) => {
+        const prof = await getProfileCached(c.createdBy);
+        return { ...c, creatorName: prof.displayName, creatorPhoto: prof.photoURL };
+      }));
+      setBoardCommentList(enriched);
+    });
+  };
+
+  const closeBoardComments = () => {
+    setBoardCommentModalOpen(false);
+    setBoardCommentText('');
+    setBoardCommentList([]);
+    if (boardCommentsUnsubRef.current) {
+      boardCommentsUnsubRef.current();
+      boardCommentsUnsubRef.current = null;
+    }
+  };
+
+  const postBoardComment = async () => {
+    if (!boardCommentText.trim()) return;
+    try {
+      await addDoc(collection(db, 'boards', boardId, 'comments'), {
+        text: boardCommentText.trim(),
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      setBoardCommentText('');
+      showToast('Comment posted', 'success', 2000);
+    } catch (err) {
+      console.error('post board comment error', err);
+      showToast('Could not post comment', 'error', 3000);
+    }
+  };
+
   // -------------------- long-press handlers --------------------
   const startLongPress = (index) => {
     longPressTimerRef.current = setTimeout(() => {
@@ -356,6 +558,46 @@ export default function BoardPage({ user }) {
     } catch (err) {
       console.error('delete image error', err);
       showToast('Could not delete pick', 'error', 3000);
+    }
+  };
+
+  // -------------------- Share board logic --------------------
+  const handleShareBoard = async () => {
+    const email = prompt('Enter email of person to share with');
+    if (!email || !email.trim()) return;
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email.trim()));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        showToast('User not found', 'error', 3000);
+        return;
+      }
+      const userDoc = snap.docs[0];
+      const uid = userDoc.id;
+
+      // write collaborator doc
+      await setDoc(doc(db, 'boards', boardId, 'collaborators', uid), { role: 'collaborator', addedAt: serverTimestamp() });
+
+      // OPTIONAL: create a notification for that user
+      try {
+        const payload = {
+          type: 'shared_board',
+          text: `${user.displayName || 'Someone'} shared a board with you: ${boardTitle || ''}`,
+          createdAt: serverTimestamp(),
+          read: false,
+          boardId,
+          actor: user.uid,
+          url: `/board/${boardId}`,
+        };
+        await addDoc(collection(db, 'users', uid, 'notifications'), payload);
+      } catch (err) {
+        console.warn('Could not create share notification', err);
+      }
+
+      showToast('Board shared', 'success', 2500);
+    } catch (err) {
+      console.error('share board error', err);
+      showToast('Could not share board', 'error', 3000);
     }
   };
 
@@ -441,24 +683,34 @@ export default function BoardPage({ user }) {
   }, [showBoardMenu]);
 
   return (
-    <div style={{ marginTop: '0px' }}>
+ <div style={{ marginTop: '0px' }}>
       {/* boardpage HEADER kinda */}
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
         <button onClick={handleBack} aria-label="Back" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 1, marginRight: 8, display: 'inline-flex', alignItems: 'center', outline: 'none' }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
 
-        <div style={{ position: 'relative' }} ref={menuRef}>
-          <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, marginTop: 8, outline: 'none' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+        {/* board comments button (restored) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            <span style={{ fontSize: 13, color: '#444' }}>{boardCommentsCount}</span>
           </button>
 
-          {showBoardMenu && (
-            <div role="menu" style={{ position: 'absolute', right: 0, top: '36px', minWidth: 160, background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, zIndex: 120 }}>
-              <button onClick={() => handleRename(boardId, boardTitle)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>Rename</button>
-              <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>Delete board</button>
-            </div>
-          )}
+          <div style={{ position: 'relative' }} ref={menuRef}>
+            <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, marginTop: 8, outline: 'none' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+            </button>
+
+            {showBoardMenu && (
+              <div role="menu" style={{ position: 'absolute', right: 0, top: '36px', minWidth: 180, background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, zIndex: 120 }}>
+                <button onClick={handleShareBoard} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: '#e6ffef', cursor: 'pointer', color: '#0b6b2f', borderRadius: 6, fontWeight: 600 }}>Share board</button>
+                <div style={{ height: 8 }} />
+                <button onClick={() => handleRename(boardId, boardTitle)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>Rename</button>
+                <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>Delete board</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -466,7 +718,7 @@ export default function BoardPage({ user }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginLeft: '8px' }}>
         <h2 style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', userSelect: 'none', margin: 0, lineHeight: 1.06, marginBottom: '10px' }}>
           {boardTitle}{' '}
-          <span style={{ fontSize: '0.9rem', color: '#888', marginTop: '9px' }}>{images.length} {images.length === 1 ? 'pick' : 'picks'}</span>
+          <span style={{ fontSize: '0.9rem', color: '#888', marginTop: '9px' }}>{images.length} {images.length === 1 ? 'pick' : 'picks'} {lastOpenedShort ? (<><span style={{ margin: '0 6px' }}>·</span>{lastOpenedShort}</>) : null}</span>
         </h2>
       </div>
 
@@ -522,6 +774,82 @@ export default function BoardPage({ user }) {
       {modalIndex !== null && (
         <div onClick={() => setModalIndex(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }} onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }} onTouchMove={(e) => { touchEndX.current = e.touches[0].clientX; }} onTouchEnd={() => { if (touchStartX.current !== null && touchEndX.current !== null) { const delta = touchEndX.current - touchStartX.current; const threshold = 50; if (delta > threshold) setModalIndex((prev) => prev === 0 ? images.length - 1 : prev - 1); else if (delta < -threshold) setModalIndex((prev) => prev === images.length - 1 ? 0 : prev + 1); } touchStartX.current = null; touchEndX.current = null; }}>
           <img src={images[modalIndex]?.src} alt="Full view" style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.4)', transition: 'transform 0.3s ease' }} />
+
+          {/* toolbar under the image inside the modal: Comment button (keeps same visual position as before) */}
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button aria-label="Comments" onClick={() => openCommentsForIndex(modalIndex)} style={{ background: 'rgba(0,0,0,0.6)', border: 'none', padding: '8px 12px', color: '#fff', borderRadius: 999, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+              <span style={{ fontSize: 14 }}>{commentCounts[images[modalIndex]?.id] ?? 0}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Comments modal (separate) */}
+      {commentModalOpen && (
+        <div onClick={closeComments} style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '94%', maxWidth: 720, maxHeight: '80vh', background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: 12, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>Comments</strong>
+              <button onClick={closeComments} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 20 }}>×</button>
+            </div>
+
+            <div style={{ padding: 12, overflowY: 'auto', flex: 1 }}>
+              {commentList.length === 0 ? (
+                <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>No comments yet — be the first to write one.</div>
+              ) : (
+                commentList.map((c) => (
+                  <div key={c.id} style={{ padding: 8, borderRadius: 8, marginBottom: 8, background: '#f8f9fb', display: 'flex', gap: 12 }}>
+                    <img src={c.creatorPhoto || '/default-avatar.png'} alt={c.creatorName} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{c.creatorName || c.createdBy}</div>
+                      <div style={{ marginTop: 6 }}>{c.text}</div>
+                      <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>{c.createdAt?.seconds ? `${Math.round((Date.now() - c.createdAt.seconds * 1000) / 60000)}m` : ''}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
+              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment..." style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }} />
+              <button onClick={postComment} style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Board comments modal (beside 3-dots) */}
+      {boardCommentModalOpen && (
+        <div onClick={closeBoardComments} style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '94%', maxWidth: 720, maxHeight: '80vh', background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: 12, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>Board Comments</strong>
+              <button onClick={closeBoardComments} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 20 }}>×</button>
+            </div>
+
+            <div style={{ padding: 12, overflowY: 'auto', flex: 1 }}>
+              {boardCommentList.length === 0 ? (
+                <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>No comments yet — be the first to write one.</div>
+              ) : (
+                boardCommentList.map((c) => (
+                  <div key={c.id} style={{ padding: 8, borderRadius: 8, marginBottom: 8, background: '#f8f9fb', display: 'flex', gap: 12 }}>
+                    <img src={c.creatorPhoto || '/default-avatar.png'} alt={c.creatorName} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{c.creatorName || c.createdBy}</div>
+                      <div style={{ marginTop: 6 }}>{c.text}</div>
+                      <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>{c.createdAt?.seconds ? `${Math.round((Date.now() - c.createdAt.seconds * 1000) / 60000)}m` : ''}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
+              <input value={boardCommentText} onChange={(e) => setBoardCommentText(e.target.value)} placeholder="Write a comment..." style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }} />
+              <button onClick={postBoardComment} style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
+            </div>
+          </div>
         </div>
       )}
 
