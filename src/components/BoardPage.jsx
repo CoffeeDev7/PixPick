@@ -71,6 +71,13 @@ export default function BoardPage({ user }) {
   // short "last opened" string
   const [lastOpenedShort, setLastOpenedShort] = useState('');
 
+  // whether to notify collaborators when posting an image comment
+const [notifyFriends, setNotifyFriends] = useState(false);
+
+// separate flag for board-level comments
+const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
+
+
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
     setToast({ msg, type, duration });
@@ -472,22 +479,45 @@ export default function BoardPage({ user }) {
   };
 
   const postComment = async () => {
-    if (!commentText.trim()) return;
-    const image = images[modalIndex];
-    if (!image) return;
-    try {
-      await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
-        text: commentText.trim(),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      setCommentText('');
-      showToast('Comment posted', 'success', 2000);
-    } catch (err) {
-      console.error('post comment error', err);
-      showToast('Could not post comment', 'error', 3000);
+  if (!commentText.trim()) return;
+  const image = images[modalIndex];
+  if (!image) return;
+  try {
+    const newDocRef = await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
+      text: commentText.trim(),
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+    });
+
+    // optionally notify collaborators (excluding the poster)
+    if (notifyFriends && collaborators && collaborators.length > 0) {
+      try {
+        const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+        const payload = {
+          type: 'comment',
+          text: `${user.displayName || 'Someone'} commented on a pick in ${boardTitle || ''}`,
+          createdAt: serverTimestamp(),
+          read: false,
+          boardId,
+          imageId: image.id,
+          actor: user.uid,
+          url: `/board/${boardId}?image=${image.id}`,
+        };
+        await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+      } catch (err) {
+        console.warn('Could not create comment notifications', err);
+      }
     }
-  };
+
+    setCommentText('');
+    setNotifyFriends(false); // reset checkbox
+    showToast('Comment posted', 'success', 2000);
+  } catch (err) {
+    console.error('post comment error', err);
+    showToast('Could not post comment', 'error', 3000);
+  }
+};
+
 
   // -------------------- board-level comments modal --------------------
   const openBoardComments = () => {
@@ -516,20 +546,41 @@ export default function BoardPage({ user }) {
   };
 
   const postBoardComment = async () => {
-    if (!boardCommentText.trim()) return;
-    try {
-      await addDoc(collection(db, 'boards', boardId, 'comments'), {
-        text: boardCommentText.trim(),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      setBoardCommentText('');
-      showToast('Comment posted', 'success', 2000);
-    } catch (err) {
-      console.error('post board comment error', err);
-      showToast('Could not post comment', 'error', 3000);
+  if (!boardCommentText.trim()) return;
+  try {
+    const newDocRef = await addDoc(collection(db, 'boards', boardId, 'comments'), {
+      text: boardCommentText.trim(),
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+    });
+
+    if (boardNotifyFriends && collaborators && collaborators.length > 0) {
+      try {
+        const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+        const payload = {
+          type: 'board_comment',
+          text: `${user.displayName || 'Someone'} commented on the board ${boardTitle || ''}`,
+          createdAt: serverTimestamp(),
+          read: false,
+          boardId,
+          actor: user.uid,
+          url: `/board/${boardId}`,
+        };
+        await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+      } catch (err) {
+        console.warn('Could not create board comment notifications', err);
+      }
     }
-  };
+
+    setBoardCommentText('');
+    setBoardNotifyFriends(false);
+    showToast('Comment posted', 'success', 2000);
+  } catch (err) {
+    console.error('post board comment error', err);
+    showToast('Could not post comment', 'error', 3000);
+  }
+};
+
 
   // -------------------- long-press handlers --------------------
   const startLongPress = (index) => {
@@ -811,10 +862,39 @@ export default function BoardPage({ user }) {
               )}
             </div>
 
-            <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment..." style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }} />
-              <button onClick={postComment} style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
-            </div>
+            <div style={{ padding: 12, borderTop: '1px solid #eee' }}>
+  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+      <input
+        type="checkbox"
+        checked={notifyFriends}
+        onChange={(e) => setNotifyFriends(e.target.checked)}
+        style={{ width: 16, height: 16 }}
+      />
+      <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
+    </label>
+
+    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
+      <span title="If checked, your collaborators will receive a notification about this comment.">Will notify</span>
+    </div>
+  </div>
+
+  <div style={{ display: 'flex', gap: 8 }}>
+    <input
+      value={commentText}
+      onChange={(e) => setCommentText(e.target.value)}
+      placeholder="Write a comment..."
+      style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
+    />
+    <button
+      onClick={postComment}
+      style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
+    >
+      Post
+    </button>
+  </div>
+</div>
+
           </div>
         </div>
       )}
@@ -845,10 +925,39 @@ export default function BoardPage({ user }) {
               )}
             </div>
 
-            <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
-              <input value={boardCommentText} onChange={(e) => setBoardCommentText(e.target.value)} placeholder="Write a comment..." style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }} />
-              <button onClick={postBoardComment} style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}>Post</button>
-            </div>
+            <div style={{ padding: 12, borderTop: '1px solid #eee' }}>
+  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+      <input
+        type="checkbox"
+        checked={boardNotifyFriends}
+        onChange={(e) => setBoardNotifyFriends(e.target.checked)}
+        style={{ width: 16, height: 16 }}
+      />
+      <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
+    </label>
+
+    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
+      <span title="If checked, your collaborators will receive a notification about this board comment.">Will notify</span>
+    </div>
+  </div>
+
+  <div style={{ display: 'flex', gap: 8 }}>
+    <input
+      value={boardCommentText}
+      onChange={(e) => setBoardCommentText(e.target.value)}
+      placeholder="Write a comment..."
+      style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
+    />
+    <button
+      onClick={postBoardComment}
+      style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
+    >
+      Post
+    </button>
+  </div>
+</div>
+
           </div>
         </div>
       )}
