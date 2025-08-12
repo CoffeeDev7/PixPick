@@ -1,4 +1,4 @@
-// App.jsx — updated: animated desktop toast for new notifications + deep-link handling
+// App.jsx — updated: animated desktop toast for new notifications + deep-link handling + bell pulse animation
 import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
@@ -11,7 +11,7 @@ import { useEffect, useState, useRef } from 'react';
 import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import bellicon from './assets/bell.png';
+import React from 'react';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -190,7 +190,9 @@ export default function App() {
               onClick={() => setNotifOpen((s) => !s)}
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, position: 'relative', outline: 'none' }}
             >
-              <img src={bellicon} alt="Notifications" style={{ width: '20px', height: '20px' }} />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#151616" strokeWidth="1.8" style={{ transition: 'transform 220ms ease', animation: desktopNotif ? 'bell-pulse 900ms ease' : undefined }}>
+                <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h11z" />
+              </svg>
               {unreadCount > 0 && (
                 <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 9, background: '#ff4d4f', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, padding: '0 5px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', transformOrigin: 'center', animation: desktopNotif ? 'notif-badge 700ms ease' : undefined }}>{unreadCount}</span>
               )}
@@ -275,8 +277,8 @@ export default function App() {
       <style>{`
         @keyframes notif-badge { 0% { transform: scale(1); } 50% { transform: scale(1.25); } 100% { transform: scale(1); } }
         @keyframes desktop-toast-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes bell-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.08) rotate(-6deg); } 70% { transform: scale(1.02) rotate(4deg); } 100% { transform: scale(1); } }
       `}</style>
     </div>
   );
 }
-// App.jsx — updated: animated desktop toast for new notifications + deep-link handling
