@@ -1,4 +1,4 @@
-// ======= App.jsx =======
+// App.jsx — updated: animated desktop toast for new notifications + deep-link handling
 import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
@@ -11,7 +11,7 @@ import { useEffect, useState, useRef } from 'react';
 import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import bellicon from './assets/bell.png'; // Ensure this path is correct
+import bellicon from './assets/bell.png';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -28,6 +28,13 @@ export default function App() {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRefDom = useRef(null);
 
+  // track previous notification IDs to detect new ones
+  const prevNotifIdsRef = useRef(new Set());
+
+  // desktop toast state (tiny ephemeral notification animation)
+  const [desktopNotif, setDesktopNotif] = useState(null); // {id, title, text}
+  const desktopTimerRef = useRef(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -40,19 +47,54 @@ export default function App() {
   useEffect(() => {
     if (!user) {
       setNotifications([]);
+      prevNotifIdsRef.current = new Set();
       return;
     }
 
     const q = query(collection(db, 'users', user.uid, 'notifications'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setNotifications(list);
-    }, (err) => {
-      console.error('notifications onSnapshot error', err);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        // detect newly added notifications (ids not in prev set)
+        const prevSet = prevNotifIdsRef.current;
+        const newDocs = list.filter((n) => !prevSet.has(n.id));
+
+        if (newDocs.length > 0) {
+          // update prev set first for future diffs
+          prevNotifIdsRef.current = new Set(list.map((n) => n.id));
+
+          // show desktop toast for the most recent new notif that isn't from the current user
+          const newest = newDocs[0];
+          if (newest && newest.actor !== user.uid) {
+            // ephemeral desktop toast
+            setDesktopNotif({ id: newest.id, title: newest.type?.replace('_', ' ') || 'Activity', text: newest.text });
+            // clear any previous timer
+            if (desktopTimerRef.current) clearTimeout(desktopTimerRef.current);
+            desktopTimerRef.current = setTimeout(() => setDesktopNotif(null), 5000);
+          }
+        } else if (prevSet.size === 0 && list.length > 0) {
+          // initial load — populate prev set
+          prevNotifIdsRef.current = new Set(list.map((n) => n.id));
+        }
+
+        setNotifications(list);
+      },
+      (err) => {
+        console.error('notifications onSnapshot error', err);
+      }
+    );
 
     return () => unsub();
   }, [user]);
+
+  // clear desktop toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (desktopTimerRef.current) clearTimeout(desktopTimerRef.current);
+    };
+  }, []);
 
   // close notifications dropdown when clicking outside
   useEffect(() => {
@@ -73,6 +115,22 @@ export default function App() {
       console.error('mark read error', err);
     }
   }
+
+  // when user clicks a notification: mark read then navigate (deep-link)
+  const handleOpenNotification = async (n) => {
+    try {
+      await markNotificationRead(n);
+    } catch (err) {
+      console.error('error marking read before navigate', err);
+    }
+
+    setNotifOpen(false);
+    if (n.url) {
+      navigate(n.url, { state: { from: location.pathname } });
+    } else if (n.boardId) {
+      navigate(`/board/${n.boardId}`, { state: { from: location.pathname } });
+    }
+  };
 
   async function login() {
     const result = await signInWithPopup(auth, provider);
@@ -132,9 +190,9 @@ export default function App() {
               onClick={() => setNotifOpen((s) => !s)}
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, position: 'relative', outline: 'none' }}
             >
-              <img src={bellicon} alt="Notifications" style={{ width: 24, height: 24, filter: 'invert(0.8)' }} />
+              <img src={bellicon} alt="Notifications" style={{ width: '20px', height: '20px' }} />
               {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 9, background: '#ff4d4f', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, padding: '0 5px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>{unreadCount}</span>
+                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 9, background: '#ff4d4f', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, padding: '0 5px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', transformOrigin: 'center', animation: desktopNotif ? 'notif-badge 700ms ease' : undefined }}>{unreadCount}</span>
               )}
             </button>
 
@@ -156,15 +214,11 @@ export default function App() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{n.type?.replace('_', ' ') || 'Activity'}</div>
                         <div style={{ fontSize: 13, color: '#333' }}>{n.text}</div>
-                        <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>{(n.createdAt && n.createdAt.seconds) ? (() => {
-                          const ms = n.createdAt.seconds * 1000;
-                          const diff = Math.round((Date.now() - ms) / 60000);
-                          return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`;
-                        })() : ''}</div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>{(n.createdAt && n.createdAt.seconds) ? (() => { const ms = n.createdAt.seconds * 1000; const diff = Math.round((Date.now() - ms) / 60000); return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`; })() : ''}</div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {!n.read && <button onClick={() => markNotificationRead(n)} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Mark</button>}
-                        <button onClick={() => { if (n.url) { setNotifOpen(false); navigate(n.url); } }} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Open</button>
+                        <button onClick={() => handleOpenNotification(n)} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Open</button>
                       </div>
                     </div>
                   ))}
@@ -174,6 +228,23 @@ export default function App() {
           </div>
 
           <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#ee6c4d', color: '#333', border: 'none', borderRadius: '10px', cursor: 'pointer', marginRight: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', transition: 'all 0.25s ease', fontWeight: '500' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f77b7b'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)'; e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f9a2a2'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)'; e.currentTarget.style.transform = 'translateY(0)'; }}>Logout</button>
+        </div>
+      )}
+
+      {/* Desktop ephemeral notification toast (bottom-right of header) */}
+      {desktopNotif && (
+        <div style={{ position: 'fixed', top: 56, right: 16, zIndex: 300, animation: 'desktop-toast-in 320ms ease' }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', minWidth: 260, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 8, background: '#eef7ff', display: 'grid', placeItems: 'center', fontWeight: 700 }}>{desktopNotif.title?.charAt(0)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700 }}>{desktopNotif.title}</div>
+              <div style={{ color: '#444', marginTop: 4, fontSize: 13 }}>{desktopNotif.text}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={() => { /* open notification */ const n = notifications.find(x => x.id === desktopNotif.id); if (n) handleOpenNotification(n); setDesktopNotif(null); }} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Open</button>
+              <button onClick={() => setDesktopNotif(null)} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Dismiss</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -200,6 +271,12 @@ export default function App() {
           <Route path="/notifications" element={<NotificationsPage user={user} />} />
         </Routes>
       </div>
+
+      <style>{`
+        @keyframes notif-badge { 0% { transform: scale(1); } 50% { transform: scale(1.25); } 100% { transform: scale(1); } }
+        @keyframes desktop-toast-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      `}</style>
     </div>
   );
 }
+// App.jsx — updated: animated desktop toast for new notifications + deep-link handling
