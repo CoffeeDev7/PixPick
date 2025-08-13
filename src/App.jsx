@@ -11,7 +11,7 @@ import { useEffect, useState, useRef } from 'react';
 import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import bellicon from './assets/bell_552745.png'; 
+import bellicon from './assets/bell_552745.png';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -157,6 +157,19 @@ export default function App() {
     }
   };
 
+  // PROFILE DROPDOWN state & outside click
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileRef = useRef(null);
+  useEffect(() => {
+    function handleProfileOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) document.addEventListener('mousedown', handleProfileOutside);
+    return () => document.removeEventListener('mousedown', handleProfileOutside);
+  }, [profileMenuOpen]);
+
   // Don't render anything until we know auth state
   if (authLoading) {
     return (
@@ -198,7 +211,7 @@ export default function App() {
 
             {/* dropdown */}
             {notifOpen && (
-              <div style={{ position: 'absolute', right: 0, top: '36px', width: 320, maxWidth: 'calc(100vw - 32px)', background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, padding: 8 }}>
+              <div style={{ position: 'absolute', right: 0, top: '36px', left: '-190px', width: 320, maxWidth: 'calc(100vw - 32px)', background: '#bedfe0ff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.52)', zIndex: 200, padding: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 6px' }}>
                   <strong>Notifications</strong>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -217,8 +230,8 @@ export default function App() {
                         <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>{(n.createdAt && n.createdAt.seconds) ? (() => { const ms = n.createdAt.seconds * 1000; const diff = Math.round((Date.now() - ms) / 60000); return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`; })() : ''}</div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {!n.read && <button onClick={() => markNotificationRead(n)} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Mark</button>}
                         <button onClick={() => handleOpenNotification(n)} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Open</button>
+                        {!n.read && <button onClick={() => markNotificationRead(n)} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Mark</button>}
                       </div>
                     </div>
                   ))}
@@ -227,7 +240,62 @@ export default function App() {
             )}
           </div>
 
-          <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#ee6c4d', color: '#333', border: 'none', borderRadius: '10px', cursor: 'pointer', marginRight: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', transition: 'all 0.25s ease', fontWeight: '500' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f77b7b'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)'; e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f9a2a2'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)'; e.currentTarget.style.transform = 'translateY(0)'; }}>Logout</button>
+          {/* Profile avatar replaces the logout button */}
+          <div ref={profileRef} style={{ position: 'relative', marginRight: '12px' }}>
+            <button
+              aria-label="Profile menu"
+              onClick={() => setProfileMenuOpen((s) => !s)}
+              style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <img
+                src={user.photoURL || '/default-avatar.png'}
+                alt={user.displayName || 'Profile'}
+                style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.35)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
+              />
+            </button>
+
+            {profileMenuOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '46px', width: 200, background: '#fff', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', padding: 12, zIndex: 220 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <img src={user.photoURL || '/default-avatar.png'} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }}>{user.displayName}</div>
+                    <div style={{ fontSize: 12, color: '#666' }}>{user.email}</div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f1f1', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'center' }}>
+                  {/* The Logout button uses the same styling as before */}
+                  <button
+                    onClick={logout}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#ee6c4d',
+                      color: '#333',
+                      border: 'none',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                      transition: 'all 0.25s ease',
+                      fontWeight: '500',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f77b7b';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9a2a2';
+                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
