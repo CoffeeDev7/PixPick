@@ -1,0 +1,51 @@
+/* BoardPage.css */
+.image-grid {
+  column-count: 6;
+  column-gap: 12px;
+}
+@media (max-width: 1200px) {
+  .image-grid {
+    column-count: 5;
+  }
+}
+@media (max-width: 992px) {
+  .image-grid {
+    column-count: 4;
+  }
+}
+@media (max-width: 768px) {
+  .image-grid {
+    column-count: 2;
+  }
+}
+.image-item {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  position: relative;
+}
+.image-item img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  cursor: pointer;
+}
+.skeleton-wrapper .rect {
+  width: 100%;
+  border-radius: 8px;
+  padding-bottom: 66%;
+}
+.empty-grid {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+  font-style: italic;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.9);
+}

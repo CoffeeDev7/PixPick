@@ -18,6 +18,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
+import './BoardPage.css'; // Assuming you have a CSS file for styles
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -840,42 +841,54 @@ export default function BoardPage({ user }) {
       <textarea ref={pasteRef} placeholder="Long press and tap Paste" onPaste={handlePaste} rows={2} style={{ display: 'block', width: '100%', height: '45px', border: '2px dashed #4caf50', background: '#eaffea', fontSize: '16px', marginBottom: '16px', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
 
       {/* Images grid */}
-      <div className="image-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between' }}>
-        {imagesLoading ? (
-          Array.from({ length: 6 }).map((_, idx) => (
-            <div key={`skeleton-${idx}`} style={{ flex: '0 1 calc(50% - 6px)', background: 'transparent', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.06)', padding: 10 }}>
-              <div className="skeleton-dark rect" style={{ height: 160, borderRadius: 8 }} />
-            </div>
-          ))
-        ) : images.length === 0 ? (
-          <div style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', borderRadius: '8px', background: '#f9fafb', color: '#666', fontStyle: 'italic', textAlign: 'center' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+      <div className="image-grid">
+  {imagesLoading ? (
+    Array.from({ length: 12 }).map((_, idx) => (
+      <div key={`skeleton-${idx}`} className="skeleton-wrapper">
+        <div className="skeleton-dark rect" />
+      </div>
+    ))
+  ) : images.length === 0 ? (
+    <div className="empty-grid">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
               <circle cx="12" cy="12" r="10" />
               <line x1="8" y1="15" x2="16" y2="15" />
               <line x1="9" y1="9" x2="9.01" y2="9" />
               <line x1="15" y1="9" x2="15.01" y2="9" />
             </svg>
-            There aren't any picks in this board yet.
-          </div>
-        ) : (
-          images.map((img, i) => (
-            <div key={img.id} onMouseDown={() => startLongPress(i)} onMouseUp={() => cancelLongPress()} onMouseLeave={() => cancelLongPress()} onTouchStart={() => startLongPress(i)} onTouchEnd={() => cancelLongPress()} onTouchCancel={() => cancelLongPress()} style={{ flex: '0 1 calc(50% - 6px)', background: longPressedIndex === i ? '#fff' : 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', overflow: 'hidden', position: 'relative' }}>
-              <img src={img.src} alt="pasted" style={{ width: '100%', borderRadius: '6px', cursor: 'pointer', display: 'block' }} onClick={() => { if (longPressedIndex !== null) return; setModalIndex(i); }} />
-
-              {longPressedIndex === i && (
-                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.9)', zIndex: 40 }}>
-                  <button onClick={() => handleDeleteImage(img.id, i)} aria-label="Delete pick" style={{ width: 56, height: 56, borderRadius: 12, display: 'grid', placeItems: 'center', border: 'none', cursor: 'pointer', background: 'linear-gradient(180deg,#fff,#f6f6f6)', boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-trash" viewBox="0 0 16 16">
+      There aren't any picks in this board yet.
+    </div>
+  ) : (
+    images.map((img, i) => (
+      <div
+        key={img.id}
+        onMouseDown={() => startLongPress(i)}
+        onMouseUp={cancelLongPress}
+        onMouseLeave={cancelLongPress}
+        onTouchStart={() => startLongPress(i)}
+        onTouchEnd={cancelLongPress}
+        onTouchCancel={cancelLongPress}
+        className={`image-item ${longPressedIndex === i ? 'active' : ''}`}
+      >
+        <img
+          src={img.src}
+          alt="pasted"
+          onClick={() => { if (longPressedIndex !== null) return; setModalIndex(i); }}
+        />
+        {longPressedIndex === i && (
+          <div className="overlay">
+            <button onClick={() => handleDeleteImage(img.id, i)} aria-label="Delete pick">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-trash" viewBox="0 0 16 16">
                       <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
                       <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
                     </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
+            </button>
+          </div>
         )}
       </div>
+    ))
+  )}
+</div>
 
       {/* Modal */}
       {modalIndex !== null && (
