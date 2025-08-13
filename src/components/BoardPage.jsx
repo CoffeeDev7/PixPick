@@ -384,21 +384,31 @@ export default function BoardPage({ user }) {
       showToast('Image uploaded', 'success', 3500);
 
       try {
-        const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
-        const uids = collabSnap.docs.map(d => d.id).filter(Boolean);
-        const payload = {
-          type: 'board_activity',
-          text: `${user.displayName || 'Someone'} added a pick to ${boardTitle || 'your board'}`,
-          createdAt: serverTimestamp(),
-          read: false,
-          boardId,
-          actor: user.uid,
-          url: `/board/${boardId}?image=${docRef.id}`,
-        };
-        await Promise.all(uids.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
-      } catch (err) {
-        console.warn('Could not create notifications for collaborators', err);
-      }
+  const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
+  const uids = collabSnap.docs
+    .map(d => d.id)
+    .filter(uid => uid && uid !== user.uid); // exclude yourself
+
+  if (uids.length > 0) { // only send if others exist
+    const payload = {
+      type: 'board_activity',
+      text: `${user.displayName || 'Someone'} added a pick to ${boardTitle || 'your board'}`,
+      createdAt: serverTimestamp(),
+      read: false,
+      boardId,
+      actor: user.uid,
+      url: `/board/${boardId}?image=${docRef.id}`,
+    };
+    await Promise.all(
+      uids.map(uid =>
+        addDoc(collection(db, 'users', uid, 'notifications'), payload)
+      )
+    );
+  }
+} catch (err) {
+  console.warn('Could not create notifications for collaborators', err);
+}
+
 
     } catch (err) {
       console.error('Unexpected error saving image:', err);
