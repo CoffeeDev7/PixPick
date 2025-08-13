@@ -42,7 +42,7 @@ export default function Sidebar({
   return (
     <div style={{ padding: 16, width: width, boxSizing: 'border-box', height: '100%' }}>
       {/* Profile card */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 6, borderRadius: 12, background: CARD_BG, boxShadow: '0 6px 20px rgba(20,40,60,0.06)', marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 6, borderRadius: 16, background: CARD_BG, boxShadow: '0 6px 20px rgba(20,40,60,0.06)', marginBottom: 18 }}>
         {user?.photoURL ? (
           <img src={user.photoURL} alt={user.displayName || 'User'} style={{ width: 56, height: 56, borderRadius: 32, objectFit: 'cover', flexShrink: 0 }} />
         ) : (
@@ -58,7 +58,7 @@ export default function Sidebar({
       </div>
 
       {/* Search + create */}
-      <div style={{ marginBottom: 14, display: 'flex', gap: 8 }}>
+      {/* <div style={{ marginBottom: 14, display: 'flex', gap: 8 }}>
         <input
           aria-label="Search boards"
           placeholder="Search boards"
@@ -78,11 +78,11 @@ export default function Sidebar({
             }
             setSidebarVisible(false);
           }}
-          style={{ background: ACCENT, border: 'none', color: '#fff', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', boxShadow: '0 6px 18px rgba(27,153,159,0.18)' }}
+          style={{ background: ACCENT, border: 'none', color: '#fff', padding: '8px 10px', borderRadius: 80, cursor: 'pointer', boxShadow: '0 6px 18px rgba(27,153,159,0.18)' }}
         >
           +
         </button>
-      </div>
+      </div> */}
 
       {/* Tabs */}
       <nav aria-label="Main" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

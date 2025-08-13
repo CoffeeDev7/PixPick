@@ -1,23 +1,23 @@
+// BoardList.jsx
 import { useEffect, useState, useRef } from "react";
 import {
   collection,
-  collectionGroup,
   query,
-  where,
+  orderBy,
+  limit,
   getDocs,
   getDoc,
   onSnapshot,
-  orderBy,
-  limit,
+  where,
   doc,
   updateDoc,
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // <- added useLocation
 import { FiTrash2 } from "react-icons/fi";
 import { MdEdit } from "react-icons/md";
-import { MdViewModule, MdViewDay, MdTextFields } from "react-icons/md"; // refined icons
+import { MdViewModule, MdViewDay, MdTextFields, MdSearch, MdMoreVert } from "react-icons/md"; // refined icons
 
 export default function BoardList({ user, selected }) {
   const [boards, setBoards] = useState([]);
@@ -26,172 +26,169 @@ export default function BoardList({ user, selected }) {
   const [viewMode, setViewMode] = useState("wide"); // "wide" or "compact" or "plain"
   const [imagesLoading, setImagesLoading] = useState(true); // NEW: loading flag for images
   const navigate = useNavigate();
+  const location = useLocation();
   const menuRef = useRef();
   // put once in the component body (so the Map persists)
-const imagesUnsubsRef = useRef(new Map());
+  const imagesUnsubsRef = useRef(new Map());
+
+  // search + view popover state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewPopoverOpen, setViewPopoverOpen] = useState(false);
+  const viewPopoverRef = useRef();
 
   // Fetch boards list
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  let boardUnsub = null;
-  const collabUnsubs = new Map(); // to store unsubscribers for collaborators listeners
+    let boardUnsub = null;
+    const collabUnsubs = new Map(); // to store unsubscribers for collaborators listeners
 
-  const startListening = () => {
-    // Main boards listener
-    boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
-      const tempBoards = [];
+    const startListening = () => {
+      // Main boards listener
+      boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
+        const tempBoards = [];
 
-      boardsSnap.forEach((boardDoc) => {
-        const boardData = { id: boardDoc.id, ...boardDoc.data() };
+        boardsSnap.forEach((boardDoc) => {
+          const boardData = { id: boardDoc.id, ...boardDoc.data() };
 
-        // My Boards → only owned by me
-        if (selected === "My Boards") {
-          if (boardData.ownerId === user.uid) {
-            tempBoards.push(boardData);
+          // My Boards → only owned by me
+          if (selected === "My Boards") {
+            if (boardData.ownerId === user.uid) {
+              tempBoards.push(boardData);
+            }
           }
-        }
 
-        // Shared with Me → listen to collaborators
-        else if (selected === "Shared with Me") {
-          if (!collabUnsubs.has(boardDoc.id)) {
-            const unsub = onSnapshot(
-              collection(db, "boards", boardDoc.id, "collaborators"),
-              (collabSnap) => {
-                const isCollaborator = collabSnap.docs.some(
-                  (c) => c.id === user.uid && c.data().role !== "owner"
-                );
-                if (isCollaborator) {
-                  setBoards((prev) => {
-                    const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
-                    return [...withoutBoard, boardData].sort(
-                      (a, b) =>
-                        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-                    );
-                  });
-                } else {
-                  setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+          // Shared with Me → listen to collaborators
+          else if (selected === "Shared with Me") {
+            if (!collabUnsubs.has(boardDoc.id)) {
+              const unsub = onSnapshot(
+                collection(db, "boards", boardDoc.id, "collaborators"),
+                (collabSnap) => {
+                  const isCollaborator = collabSnap.docs.some(
+                    (c) => c.id === user.uid && c.data().role !== "owner"
+                  );
+                  if (isCollaborator) {
+                    setBoards((prev) => {
+                      const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
+                      return [...withoutBoard, boardData].sort(
+                        (a, b) =>
+                          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+                      );
+                    });
+                  } else {
+                    setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+                  }
                 }
-              }
-            );
-            collabUnsubs.set(boardDoc.id, unsub);
+              );
+              collabUnsubs.set(boardDoc.id, unsub);
+            }
           }
-        }
 
-        // All Boards → owned by me OR in collaborators
-        else if (selected === "All Boards") {
-          if (boardData.ownerId === user.uid) {
-            tempBoards.push(boardData);
-          }
-          if (!collabUnsubs.has(boardDoc.id)) {
-            const unsub = onSnapshot(
-              collection(db, "boards", boardDoc.id, "collaborators"),
-              (collabSnap) => {
-                const isCollaborator = collabSnap.docs.some(
-                  (c) => c.id === user.uid
-                );
-                if (isCollaborator || boardData.ownerId === user.uid) {
-                  setBoards((prev) => {
-                    const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
-                    return [...withoutBoard, boardData].sort(
-                      (a, b) =>
-                        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-                    );
-                  });
-                } else {
-                  setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+          // All Boards → owned by me OR in collaborators
+          else if (selected === "All Boards") {
+            if (boardData.ownerId === user.uid) {
+              tempBoards.push(boardData);
+            }
+            if (!collabUnsubs.has(boardDoc.id)) {
+              const unsub = onSnapshot(
+                collection(db, "boards", boardDoc.id, "collaborators"),
+                (collabSnap) => {
+                  const isCollaborator = collabSnap.docs.some(
+                    (c) => c.id === user.uid
+                  );
+                  if (isCollaborator || boardData.ownerId === user.uid) {
+                    setBoards((prev) => {
+                      const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
+                      return [...withoutBoard, boardData].sort(
+                        (a, b) =>
+                          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+                      );
+                    });
+                  } else {
+                    setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
+                  }
                 }
-              }
-            );
-            collabUnsubs.set(boardDoc.id, unsub);
+              );
+              collabUnsubs.set(boardDoc.id, unsub);
+            }
           }
-        }
-      });
-
-      // For My Boards, we can set all at once
-      if (selected === "My Boards") {
-        setBoards(tempBoards.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      }
-    });
-  };
-
-  startListening();
-
-  return () => {
-    if (boardUnsub) boardUnsub();
-    collabUnsubs.forEach((unsub) => unsub());
-  };
-}, [user, selected]);
-
-
-
-  // Fetch latest 3 images for each board
-useEffect(() => {
-  if (!user) return;
-
-  // boards should already be the state you're maintaining from the first useEffect
-  // If you don't have `boards` state yet, derive visible board ids the same way you did for fetchDocs.
-  setImagesLoading(true);
-
-  const visibleBoardIds = boards.map((b) => b.id);
-
-  // 1) Ensure listeners exist for visible boards
-  visibleBoardIds.forEach((boardId) => {
-    if (imagesUnsubsRef.current.has(boardId)) return; // already listening
-
-    const imagesRef = collection(db, "boards", boardId, "images");
-    const q = query(imagesRef, orderBy("createdAt", "desc"), limit(3));
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const latestImages = snap.docs.map((d) => d.data().src || "");
-        // update state (merge with previous)
-        setlatestboardimages((prev) => {
-          // avoid unnecessary state change when no difference (optional)
-          const old = prev[boardId] || [];
-          const same =
-            old.length === latestImages.length &&
-            old.every((v, i) => v === latestImages[i]);
-          if (same) return prev;
-          return { ...prev, [boardId]: latestImages };
         });
 
-        setImagesLoading(false);
-      },
-      (err) => {
-        console.error("images listener error for", boardId, err);
-      }
-    );
-
-    imagesUnsubsRef.current.set(boardId, unsub);
-  });
-
-  // 2) Remove listeners for boards no longer visible
-  imagesUnsubsRef.current.forEach((unsub, id) => {
-    if (!visibleBoardIds.includes(id)) {
-      unsub();
-      imagesUnsubsRef.current.delete(id);
-      // remove from state
-      setlatestboardimages((prev) => {
-        if (!prev[id]) return prev;
-        const copy = { ...prev };
-        delete copy[id];
-        return copy;
+        // For My Boards, we can set all at once
+        if (selected === "My Boards") {
+          setBoards(tempBoards.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+        }
       });
-    }
-  });
+    };
 
-  // cleanup on unmount / dependency change
-  return () => {
-    // we don't tear down all listeners here if you want them to persist between filters.
-    // But on component unmount, clear everything:
-    // (React will call this effect's cleanup on dependency change too; this ensures we don't leak)
-    imagesUnsubsRef.current.forEach((unsub) => unsub());
-    imagesUnsubsRef.current.clear();
-  };
-}, [user, selected, boards]); // boards should be the state that the first useEffect sets
+    startListening();
 
+    return () => {
+      if (boardUnsub) boardUnsub();
+      collabUnsubs.forEach((unsub) => unsub());
+    };
+  }, [user, selected]);
+
+  // Fetch latest 3 images for each board
+  useEffect(() => {
+    if (!user) return;
+
+    setImagesLoading(true);
+
+    const visibleBoardIds = boards.map((b) => b.id);
+
+    // 1) Ensure listeners exist for visible boards
+    visibleBoardIds.forEach((boardId) => {
+      if (imagesUnsubsRef.current.has(boardId)) return; // already listening
+
+      const imagesRef = collection(db, "boards", boardId, "images");
+      const q = query(imagesRef, orderBy("createdAt", "desc"), limit(3));
+
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const latestImages = snap.docs.map((d) => d.data().src || "");
+          // update state (merge with previous)
+          setlatestboardimages((prev) => {
+            const old = prev[boardId] || [];
+            const same =
+              old.length === latestImages.length &&
+              old.every((v, i) => v === latestImages[i]);
+            if (same) return prev;
+            return { ...prev, [boardId]: latestImages };
+          });
+
+          setImagesLoading(false);
+        },
+        (err) => {
+          console.error("images listener error for", boardId, err);
+        }
+      );
+
+      imagesUnsubsRef.current.set(boardId, unsub);
+    });
+
+    // 2) Remove listeners for boards no longer visible
+    imagesUnsubsRef.current.forEach((unsub, id) => {
+      if (!visibleBoardIds.includes(id)) {
+        unsub();
+        imagesUnsubsRef.current.delete(id);
+        // remove from state
+        setlatestboardimages((prev) => {
+          if (!prev[id]) return prev;
+          const copy = { ...prev };
+          delete copy[id];
+          return copy;
+        });
+      }
+    });
+
+    // cleanup on unmount / dependency change
+    return () => {
+      imagesUnsubsRef.current.forEach((unsub) => unsub());
+      imagesUnsubsRef.current.clear();
+    };
+  }, [user, selected, boards]);
 
   const handleRename = (boardId, currentTitle) => {
     const newTitle = prompt("Enter new title", currentTitle);
@@ -236,12 +233,20 @@ useEffect(() => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpenFor(null);
       }
+      if (viewPopoverRef.current && !viewPopoverRef.current.contains(e.target)) {
+        setViewPopoverOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // filtered boards based on search term (case-insensitive)
+  const filteredBoards = boards.filter((b) =>
+    b.title ? b.title.toLowerCase().includes(searchTerm.trim().toLowerCase()) : false
+  );
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
@@ -333,11 +338,6 @@ useEffect(() => {
           height: 180px;
           grid-template-columns: 1.5fr 1fr;
         }
-        .wide .preview-images {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
         .board-grid.plain .board-cover {
           display: none;
         }
@@ -394,13 +394,13 @@ useEffect(() => {
 
         .seg-btn:focus {
           outline: none;
-          box-shadow: 0 0 0 4px rgba(27, 153, 159, 0.90); /* teal glow focus ring */
+          box-shadow: 0 0 0 4px rgba(27, 153, 159, 0.12); /* teal glow focus ring */
         }
 
         .seg-btn.active {
           background: #1b999f; /* your teal */
           color: white;
-          box-shadow: 0 6px 14px rgba(16,16,20,0.46);
+          box-shadow: 0 6px 14px rgba(16,16,20,0.16);
           transform: translateY(-1px);
         }
 
@@ -414,17 +414,39 @@ useEffect(() => {
           font-size: 13px;
         }
 
-        /* visually hidden text for a11y (if you want) */
-        .sr-only {
+        /* search bar styles */
+        .search-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .search-input {
+          flex: 1;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid #e6e6ea;
+          background: #fff;
+          box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .search-input input {
+          border: none;
+          outline: none;
+          flex: 1;
+          font-size: 14px;
+        }
+        .view-popover {
           position: absolute;
-          width: 1px;
-          height: 1px;
-          padding: 0;
-          margin: -1px;
-          overflow: hidden;
-          clip: rect(0,0,0,0);
-          white-space: nowrap;
-          border: 0;
+          top: 46px;
+          right: 0;
+          background: #fff;
+          border-radius: 10px;
+          padding: 10px;
+          box-shadow: 0 12px 36px rgba(0,0,0,0.12);
+          z-index: 150;
         }
 
         /* Skeleton styles */
@@ -449,55 +471,102 @@ useEffect(() => {
         }
       `}</style>
 
-      {/* Rounded icon-only segmented control */}
-      <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center" }}>
-        <div className="segmented-pill" role="tablist" aria-label="View mode">
-          <button
-            className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
-            onClick={() => setViewMode("wide")}
-            title="Wide view"
-            aria-pressed={viewMode === "wide"}
-            aria-label="Wide view"
-          >
-            <MdViewModule size={18} />
-            <span className="sr-only">Wide</span>
-          </button>
-
-          <button
-            className={`seg-btn ${viewMode === "compact" ? "active" : ""}`}
-            onClick={() => setViewMode("compact")}
-            title="Compact view"
-            aria-pressed={viewMode === "compact"}
-            aria-label="Compact view"
-          >
-            <MdViewDay size={18} />
-            <span className="sr-only">Compact</span>
-          </button>
-
-          <button
-            className={`seg-btn ${viewMode === "plain" ? "active" : ""}`}
-            onClick={() => setViewMode("plain")}
-            title="Plain list"
-            aria-pressed={viewMode === "plain"}
-            aria-label="Plain list"
-          >
-            <MdTextFields size={18} />
-            <span className="sr-only">Plain</span>
-          </button>
+      {/* Top controls area - search + view menu button */}
+      <div style={{ marginBottom: "1rem", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          
+          <div />
         </div>
 
-        {/* optional descriptive labels - remove if you prefer purely icon-only */}
-        <div className="seg-labels" aria-hidden="true">
-          <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>
-          <div style={{ opacity: viewMode === "compact" ? 1 : 0.5 }}>Compact</div>
-          <div style={{ opacity: viewMode === "plain" ? 1 : 0.5 }}>Plain</div>
+        {/* Search + view button row */}
+        <div className="search-row">
+          <div className="search-input" role="search" aria-label="Search boards">
+            <MdSearch size={18} style={{ opacity: 0.6 }} />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search boards by title..."
+              aria-label="Search boards"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm("")} style={{ border: "none", background: "transparent", cursor: "pointer" }} aria-label="Clear search">
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* view popover toggle button */}
+          <div style={{ position: "relative" }} ref={viewPopoverRef}>
+            <button
+              title="Change view"
+              aria-label="Change view"
+              onClick={() => setViewPopoverOpen((s) => !s)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                border: "1px solid #e6e6ea",
+                background: "#fff",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+              }}
+            >
+              <MdMoreVert size={20} />
+            </button>
+
+            {viewPopoverOpen && (
+              <div className="view-popover" role="dialog" aria-label="View options">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="segmented-pill" role="tablist" aria-label="View mode">
+                    <button
+                      className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
+                      onClick={() => { setViewMode("wide"); setViewPopoverOpen(false); }}
+                      title="Wide view"
+                      aria-pressed={viewMode === "wide"}
+                      aria-label="Wide view"
+                    >
+                      <MdViewModule size={18} />
+                    </button>
+
+                    <button
+                      className={`seg-btn ${viewMode === "compact" ? "active" : ""}`}
+                      onClick={() => { setViewMode("compact"); setViewPopoverOpen(false); }}
+                      title="Compact view"
+                      aria-pressed={viewMode === "compact"}
+                      aria-label="Compact view"
+                    >
+                      <MdViewDay size={18} />
+                    </button>
+
+                    <button
+                      className={`seg-btn ${viewMode === "plain" ? "active" : ""}`}
+                      onClick={() => { setViewMode("plain"); setViewPopoverOpen(false); }}
+                      title="Plain list"
+                      aria-pressed={viewMode === "plain"}
+                      aria-label="Plain list"
+                    >
+                      <MdTextFields size={18} />
+                    </button>
+                  </div>
+
+                  <div className="seg-labels" aria-hidden="true" style={{ marginLeft: 8 }}>
+                    <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>
+                    <div style={{ opacity: viewMode === "compact" ? 1 : 0.5 }}>Compact</div>
+                    <div style={{ opacity: viewMode === "plain" ? 1 : 0.5 }}>Plain</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {boards.length === 0 && <p>No boards to show</p>}
+      {filteredBoards.length === 0 && <p>No boards to show</p>}
 
       <div className={`board-grid ${viewMode}`}>
-        {boards.map((board) => {
+        {filteredBoards.map((board) => {
           const imgs = latestboardimages[board.id] || [];
           return (
             <div
@@ -556,24 +625,6 @@ useEffect(() => {
                     : "🤝 Shared with you"}
                 </div>
               </div>
-
-              {/* 3 dot menu --> commenting out this because its already in boardpage. */}
-              {/* <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpenFor(board.id);
-                }}
-                style={{
-                  position: "absolute",
-                  top: "10px",
-                  right: "10px",
-                  padding: "6px",
-                  borderRadius: "50%",
-                  cursor: "pointer",
-                }}
-              >
-                ⋮
-              </div> */}
 
               {menuOpenFor === board.id && (
                 <div
