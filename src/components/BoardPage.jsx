@@ -72,11 +72,10 @@ export default function BoardPage({ user }) {
   const [lastOpenedShort, setLastOpenedShort] = useState('');
 
   // whether to notify collaborators when posting an image comment
-const [notifyFriends, setNotifyFriends] = useState(false);
+  const [notifyFriends, setNotifyFriends] = useState(false);
 
-// separate flag for board-level comments
-const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
-
+  // separate flag for board-level comments
+  const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
 
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
@@ -479,45 +478,44 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
   };
 
   const postComment = async () => {
-  if (!commentText.trim()) return;
-  const image = images[modalIndex];
-  if (!image) return;
-  try {
-    const newDocRef = await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
-      text: commentText.trim(),
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-    });
+    if (!commentText.trim()) return;
+    const image = images[modalIndex];
+    if (!image) return;
+    try {
+      const newDocRef = await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
+        text: commentText.trim(),
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      });
 
-    // optionally notify collaborators (excluding the poster)
-    if (notifyFriends && collaborators && collaborators.length > 0) {
-      try {
-        const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
-        const payload = {
-          type: 'comment',
-          text: `${user.displayName || 'Someone'} commented on a pick in ${boardTitle || ''}`,
-          createdAt: serverTimestamp(),
-          read: false,
-          boardId,
-          imageId: image.id,
-          actor: user.uid,
-          url: `/board/${boardId}?image=${image.id}`,
-        };
-        await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
-      } catch (err) {
-        console.warn('Could not create comment notifications', err);
+      // optionally notify collaborators (excluding the poster)
+      if (notifyFriends && collaborators && collaborators.length > 0) {
+        try {
+          const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+          const payload = {
+            type: 'comment',
+            text: `${user.displayName || 'Someone'} commented on a pick in ${boardTitle || ''}`,
+            createdAt: serverTimestamp(),
+            read: false,
+            boardId,
+            imageId: image.id,
+            actor: user.uid,
+            url: `/board/${boardId}?image=${image.id}`,
+          };
+          await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+        } catch (err) {
+          console.warn('Could not create comment notifications', err);
+        }
       }
+
+      setCommentText('');
+      setNotifyFriends(false); // reset checkbox
+      showToast('Comment posted', 'success', 2000);
+    } catch (err) {
+      console.error('post comment error', err);
+      showToast('Could not post comment', 'error', 3000);
     }
-
-    setCommentText('');
-    setNotifyFriends(false); // reset checkbox
-    showToast('Comment posted', 'success', 2000);
-  } catch (err) {
-    console.error('post comment error', err);
-    showToast('Could not post comment', 'error', 3000);
-  }
-};
-
+  };
 
   // -------------------- board-level comments modal --------------------
   const openBoardComments = () => {
@@ -546,41 +544,99 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
   };
 
   const postBoardComment = async () => {
-  if (!boardCommentText.trim()) return;
-  try {
-    const newDocRef = await addDoc(collection(db, 'boards', boardId, 'comments'), {
-      text: boardCommentText.trim(),
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-    });
+    if (!boardCommentText.trim()) return;
+    try {
+      const newDocRef = await addDoc(collection(db, 'boards', boardId, 'comments'), {
+        text: boardCommentText.trim(),
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      });
 
-    if (boardNotifyFriends && collaborators && collaborators.length > 0) {
-      try {
-        const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
-        const payload = {
-          type: 'board_comment',
-          text: `${user.displayName || 'Someone'} commented on the board ${boardTitle || ''}`,
-          createdAt: serverTimestamp(),
-          read: false,
-          boardId,
-          actor: user.uid,
-          url: `/board/${boardId}`,
-        };
-        await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
-      } catch (err) {
-        console.warn('Could not create board comment notifications', err);
+      if (boardNotifyFriends && collaborators && collaborators.length > 0) {
+        try {
+          const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+          const payload = {
+            type: 'board_comment',
+            text: `${user.displayName || 'Someone'} commented on the board ${boardTitle || ''}`,
+            createdAt: serverTimestamp(),
+            read: false,
+            boardId,
+            actor: user.uid,
+            url: `/board/${boardId}`,
+          };
+          await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+        } catch (err) {
+          console.warn('Could not create board comment notifications', err);
+        }
       }
+
+      setBoardCommentText('');
+      setBoardNotifyFriends(false);
+      showToast('Comment posted', 'success', 2000);
+    } catch (err) {
+      console.error('post board comment error', err);
+      showToast('Could not post comment', 'error', 3000);
+    }
+  };
+
+  // delete a board-level comment (only allowed for comment author here)
+  // If you want the board owner to also be able to delete others' comments,
+  // keep an `ownerUID` state (set it when you fetch the board) and allow it.
+  const handleDeleteBoardComment = async (commentId, commentCreatorId) => {
+    // client-side permission check: only the author can delete here
+    if (commentCreatorId !== user.uid) {
+      // optionally allow board owner: if (user.uid !== ownerUID) { ... }
+      showToast("You can only delete your own comments", "error", 2500);
+      return;
     }
 
-    setBoardCommentText('');
-    setBoardNotifyFriends(false);
-    showToast('Comment posted', 'success', 2000);
-  } catch (err) {
-    console.error('post board comment error', err);
-    showToast('Could not post comment', 'error', 3000);
-  }
-};
+    const confirmDelete = window.confirm("Delete this comment?");
+    if (!confirmDelete) return;
 
+    // optimistic UI update
+    setBoardCommentList((prev) => prev.filter((c) => c.id !== commentId));
+
+    try {
+      await deleteDoc(doc(db, "boards", boardId, "comments", commentId));
+      showToast("Comment deleted", "success", 1800);
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+      showToast("Could not delete comment — try again", "error", 3000);
+
+      // rollback UI (best effort)
+      // re-fetch comments or insert back (simpler: re-open the modal which re-subscribes)
+      if (typeof openBoardComments === "function") {
+        openBoardComments();
+      }
+    }
+  };
+
+  // delete a single image comment (optimistic UI + Firestore delete)
+  const handleDeleteImageComment = async (commentId, commentCreatorId, imageId) => {
+    // permission check (client-side): only comment author can delete.
+    if (commentCreatorId !== user.uid) {
+      showToast("You can only delete your own comments", "error", 2200);
+      return;
+    }
+
+    const confirmDelete = window.confirm("Delete this comment?");
+    if (!confirmDelete) return;
+
+    // optimistic UI: remove immediately from local state
+    setCommentList((prev) => prev.filter((c) => c.id !== commentId));
+
+    try {
+      await deleteDoc(doc(db, "boards", boardId, "images", imageId, "comments", commentId));
+      showToast("Comment deleted", "success", 1600);
+    } catch (err) {
+      console.error("Failed to delete image comment", err);
+      showToast("Could not delete comment — try again", "error", 3000);
+      // rollback: re-open subscription for the current image
+      if (typeof openCommentsForIndex === "function" && modalIndex !== null) {
+        openCommentsForIndex(modalIndex);
+      }
+    }
+  };
 
   // -------------------- long-press handlers --------------------
   const startLongPress = (index) => {
@@ -734,7 +790,7 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
   }, [showBoardMenu]);
 
   return (
- <div style={{ marginTop: '0px' }}>
+    <div style={{ marginTop: '0px' }}>
       {/* boardpage HEADER kinda */}
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
         <button onClick={handleBack} aria-label="Back" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 1, marginRight: 8, display: 'inline-flex', alignItems: 'center', outline: 'none' }}>
@@ -850,50 +906,65 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
                 <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>No comments yet — be the first to write one.</div>
               ) : (
                 commentList.map((c) => (
-                  <div key={c.id} style={{ padding: 8, borderRadius: 8, marginBottom: 8, background: '#f8f9fb', display: 'flex', gap: 12 }}>
+                  <div key={c.id} style={{ padding: 8, borderRadius: 8, marginBottom: 8, background: '#f8f9fb', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <img src={c.creatorPhoto || '/default-avatar.png'} alt={c.creatorName} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover' }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{c.creatorName || c.createdBy}</div>
                       <div style={{ marginTop: 6 }}>{c.text}</div>
                       <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>{c.createdAt?.seconds ? `${Math.round((Date.now() - c.createdAt.seconds * 1000) / 60000)}m` : ''}</div>
                     </div>
+
+                    {/* always-visible delete for image comment author */}
+                    {c.createdBy === user.uid && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteImageComment(c.id, c.createdBy, images[modalIndex]?.id); }}
+                        aria-label="Delete comment"
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 6, marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b82b2b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                          <path d="M10 11v6M14 11v6"></path>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ))
               )}
             </div>
 
             <div style={{ padding: 12, borderTop: '1px solid #eee' }}>
-  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-      <input
-        type="checkbox"
-        checked={notifyFriends}
-        onChange={(e) => setNotifyFriends(e.target.checked)}
-        style={{ width: 16, height: 16 }}
-      />
-      <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
-    </label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={notifyFriends}
+                    onChange={(e) => setNotifyFriends(e.target.checked)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
+                </label>
 
-    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
-      <span title="If checked, your collaborators will receive a notification about this comment.">Will notify</span>
-    </div>
-  </div>
+                <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
+                  <span title="If checked, your collaborators will receive a notification about this comment.">Will notify</span>
+                </div>
+              </div>
 
-  <div style={{ display: 'flex', gap: 8 }}>
-    <input
-      value={commentText}
-      onChange={(e) => setCommentText(e.target.value)}
-      placeholder="Write a comment..."
-      style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
-    />
-    <button
-      onClick={postComment}
-      style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
-    >
-      Post
-    </button>
-  </div>
-</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
+                />
+                <button
+                  onClick={postComment}
+                  style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
+                >
+                  Post
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -910,53 +981,108 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
 
             <div style={{ padding: 12, overflowY: 'auto', flex: 1 }}>
               {boardCommentList.length === 0 ? (
-                <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>No comments yet — be the first to write one.</div>
+                <div style={{ color: "#666", fontStyle: "italic" }}>No comments yet.</div>
               ) : (
-                boardCommentList.map((c) => (
-                  <div key={c.id} style={{ padding: 8, borderRadius: 8, marginBottom: 8, background: '#f8f9fb', display: 'flex', gap: 12 }}>
-                    <img src={c.creatorPhoto || '/default-avatar.png'} alt={c.creatorName} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{c.creatorName || c.createdBy}</div>
-                      <div style={{ marginTop: 6 }}>{c.text}</div>
-                      <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>{c.createdAt?.seconds ? `${Math.round((Date.now() - c.createdAt.seconds * 1000) / 60000)}m` : ''}</div>
+                boardCommentList.map((c) => {
+                  const isAuthor = c.createdBy === user.uid;
+                  return (
+                    <div
+                      key={c.id}
+                      className="comment-row"
+                      tabIndex={0}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        marginBottom: 12,
+                        alignItems: "flex-start",
+                        position: "relative",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        transition: "background 120ms ease",
+                      }}
+                    >
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
+                        <img
+                          src={(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).photoURL || "/default-avatar.png"}
+                          alt={(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).displayName || ""}
+                          style={{ width: 36, height: 36, objectFit: "cover" }}
+                        />
+                      </div>
+
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>
+                          {(collaboratorProfiles.find((p) => p.uid === c.createdBy) || {}).displayName || c.createdBy}
+                        </div>
+                        <div style={{ fontSize: 13 }}>{c.text}</div>
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 6 }}>{timeAgoShort(c.createdAt)}</div>
+                      </div>
+
+                      {/* delete button — ALWAYS visible */}
+                      {isAuthor && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteBoardComment(c.id, c.createdBy); }}
+                          aria-label="Delete comment"
+                          title="Delete comment"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            padding: 6,
+                            marginLeft: 8,
+                            opacity: 1,           // ensure visible
+                            transform: "none",    // ensure no translate
+                            transition: "none",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {/* small trash icon */}
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b82b2b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <path d="M10 11v6M14 11v6"></path>
+                          </svg>
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
             <div style={{ padding: 12, borderTop: '1px solid #eee' }}>
-  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-      <input
-        type="checkbox"
-        checked={boardNotifyFriends}
-        onChange={(e) => setBoardNotifyFriends(e.target.checked)}
-        style={{ width: 16, height: 16 }}
-      />
-      <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
-    </label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={boardNotifyFriends}
+                    onChange={(e) => setBoardNotifyFriends(e.target.checked)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontSize: 13, color: '#333' }}>Notify collaborators</span>
+                </label>
 
-    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
-      <span title="If checked, your collaborators will receive a notification about this board comment.">Will notify</span>
-    </div>
-  </div>
+                <div style={{ marginLeft: 'auto', fontSize: 12, color: '#777' }}>
+                  <span title="If checked, your collaborators will receive a notification about this board comment.">Will notify</span>
+                </div>
+              </div>
 
-  <div style={{ display: 'flex', gap: 8 }}>
-    <input
-      value={boardCommentText}
-      onChange={(e) => setBoardCommentText(e.target.value)}
-      placeholder="Write a comment..."
-      style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
-    />
-    <button
-      onClick={postBoardComment}
-      style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
-    >
-      Post
-    </button>
-  </div>
-</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={boardCommentText}
+                  onChange={(e) => setBoardCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd' }}
+                />
+                <button
+                  onClick={postBoardComment}
+                  style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#2b5fa8', color: '#fff', cursor: 'pointer' }}
+                >
+                  Post
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -989,7 +1115,10 @@ const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
             </div>
           )}
 
-          <style>{` .shimmer { position: relative; overflow: hidden; background: #e0e0e0; } .shimmer::after { content: ''; position: absolute; top: 0; left: -150%; height: 100%; width: 150%; background: linear-gradient(90deg, rgba(224,224,224,0) 0%, rgba(255,255,255,0.7) 50%, rgba(224,224,224,0) 100%); animation: shimmerMove 1.2s infinite linear; } @keyframes shimmerMove { 100% { left: 150%; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes toast-progress { from { transform: scaleX(1); opacity: 1; } to { transform: scaleX(0); opacity: 0.6; } } .skeleton-dark { background: linear-gradient(90deg, #cfcfd3 0%, #bfbfc3 50%, #cfcfd3 100%); background-size: 200% 100%; animation: shimmer-dark 1.1s linear infinite; } .skeleton-dark.rect { width: 100%; height: 100%; border-radius: 8px; } @keyframes shimmer-dark { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } } `}</style>
+          <style>{`
+           .shimmer { position: relative; overflow: hidden; background: #e0e0e0; } .shimmer::after { content: ''; position: absolute; top: 0; left: -150%; height: 100%; width: 150%; background: linear-gradient(90deg, rgba(224,224,224,0) 0%, rgba(255,255,255,0.7) 50%, rgba(224,224,224,0) 100%); animation: shimmerMove 1.2s infinite linear; } @keyframes shimmerMove { 100% { left: 150%; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes toast-progress { from { transform: scaleX(1); opacity: 1; } to { transform: scaleX(0); opacity: 0.6; } } .skeleton-dark { background: linear-gradient(90deg, #cfcfd3 0%, #bfbfc3 50%, #cfcfd3 100%); background-size: 200% 100%; animation: shimmer-dark 1.1s linear infinite; } .skeleton-dark.rect { width: 100%; height: 100%; border-radius: 8px; } @keyframes shimmer-dark { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+            `}</style>
+
         </div>
       )}
     </div>
