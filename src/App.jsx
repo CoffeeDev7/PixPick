@@ -250,8 +250,8 @@ export default function App() {
 
       {/* Sidebar Modal Overlay */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: sidebarVisible ? 'rgba(0,0,0,0.3)' : 'transparent', pointerEvents: sidebarVisible ? 'auto' : 'none', transition: 'background-color 0.3s ease', zIndex: 100 }} onClick={() => setSidebarVisible(false)}>
-        <div style={{ width: '260px', height: '100%', background: '#f5f5f5', padding: '1rem', boxSizing: 'border-box', boxShadow: '2px 0 6px rgba(0,0,0,0.2)', transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.3s ease', position: 'absolute', left: 0, top: 0, backgroundColor: '#e3f2fd', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-          <Sidebar selected={selected} setSelected={(s) => { setSelected(s); setSidebarVisible(false); navigate('/'); }} setSidebarVisible={setSidebarVisible} user={user} />
+        <div style={{ width: '290px', height: '100%', background: '#f5f5f5', padding: '0.2rem', boxSizing: 'border-box', boxShadow: '2px 0 6px rgba(0,0,0,0.2)', transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.3s ease', position: 'absolute', left: 0, top: 0, backgroundColor: '#e3f2fd', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <Sidebar selected={selected} width={280} setSelected={(s) => { setSelected(s); setSidebarVisible(false); navigate('/'); }} setSidebarVisible={setSidebarVisible} user={user} />
         </div>
       </div>
 
