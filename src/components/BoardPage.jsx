@@ -327,7 +327,8 @@ export default function BoardPage({ user }) {
       if (boardSnap.exists()) {
         const data = boardSnap.data();
         setBoardTitle(data.title || '(Untitled)');
-        const ts = data.lastOpenedAt || data.updatedAt || data.createdAt || null;
+        // prefer updatedAt -> lastOpenedAt -> createdAt
+      const ts = data.updatedAt || data.createdAt || null;
         setLastOpenedShort(timeAgoShort(ts));
       } else {
         setBoardTitle('(Board not found)');
@@ -336,6 +337,17 @@ export default function BoardPage({ user }) {
 
     fetchBoardTitle();
   }, [boardId]);
+
+  // update header short time when images change (new pick added)
+useEffect(() => {
+  if (!images || images.length === 0) return;
+  // images expected ordered by createdAt desc — use first one
+  const newestImgTs = images[0].createdAt || null;
+  if (newestImgTs) {
+    setLastOpenedShort(timeAgoShort(newestImgTs));
+  }
+}, [images]); // images is your state from onSnapshot
+
 
   // -------------------- deep-link: open image modal when ?image=<id> present --------------------
   useEffect(() => {
@@ -380,6 +392,17 @@ export default function BoardPage({ user }) {
         createdAt: serverTimestamp(),
         rating: null,
       });
+
+      // optimistic immediate UI: show "just now"
+    setLastOpenedShort('just now');
+
+    // update the board doc so board.updatedAt / lastOpenedAt is fresh for others
+    try {
+      const boardRef = doc(db, 'boards', boardId);
+      await updateDoc(boardRef, { updatedAt: serverTimestamp() });
+    } catch (err) {
+      console.warn('Could not update board.updatedAt', err);
+    }
 
       showToast('Image uploaded', 'success', 3500);
 
