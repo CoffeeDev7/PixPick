@@ -48,7 +48,7 @@ const [dragOverIndex, setDragOverIndex] = useState(null);
   const [imagesLoading, setImagesLoading] = useState(true);
 
   // Long-press state for showing delete overlay on a particular image
-  const [longPressedIndex, setLongPressedIndex] = useState(null);
+  //const [longPressedIndex, setLongPressedIndex] = useState(null);
   const longPressTimerRef = useRef(null);
   const LONG_PRESS_MS = 400; // 300ms like Pinterest
 
@@ -182,6 +182,20 @@ const [dragOverIndex, setDragOverIndex] = useState(null);
 
     fetchCollaboratorAndOwnerUIDs();
   }, [boardId]);
+
+  // escape key handler to exit reorder mode
+  useEffect(() => {
+  const onKey = (e) => {
+    if (e.key === 'Escape' && reorderMode) {
+      setReorderMode(false);
+      setDraggingIndex(null);
+      setDragOverIndex(null);
+      showToast('Reorder mode exited', 'info', 1200);
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [reorderMode]);
 
   // realtime collaborators list
   useEffect(() => {
@@ -783,17 +797,28 @@ useEffect(() => {
   };
 
   // -------------------- long-press handlers --------------------
-  const startLongPress = (index) => {
-    longPressTimerRef.current = setTimeout(() => {
-      setLongPressedIndex(index);
-    }, LONG_PRESS_MS);
-  };
-  const cancelLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
+  // LONG_PRESS_MS can stay the same (400) or bump to 500/600 if you want a longer hold
+const startLongPress = (index) => {
+  // make sure any prior timer is cleared
+  if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+
+  longPressTimerRef.current = setTimeout(() => {
+    // Enter reorder mode and set the active "dragging" item so user can move it
+    setReorderMode(true);
+    setDraggingIndex(index);
+
+    // small UX hint
+    showToast('Reorder mode enabled — use drag (desktop) or move buttons (mobile). Press Escape to finish.', 'info', 2500);
+  }, LONG_PRESS_MS);
+};
+
+const cancelLongPress = () => {
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  }
+};
+
 
   // delete single image
   const handleDeleteImage = async (imageId, index) => {
@@ -1037,7 +1062,7 @@ useEffect(() => {
           onTouchStart={() => startLongPress(i)}
           onTouchEnd={cancelLongPress}
           onTouchCancel={cancelLongPress}
-          className={`image-item ${longPressedIndex === i ? 'active' : ''} ${reorderMode ? 'jiggle' : ''} ${draggingIndex === i ? 'dragging' : ''} ${dragOverIndex === i ? 'drag-over' : ''}`}
+          className={`image-item ${reorderMode ? 'jiggle' : ''} ${draggingIndex === i ? 'dragging' : ''} ${dragOverIndex === i ? 'drag-over' : ''}`}
           draggable={reorderMode}
           onDragStart={(e) => onDragStart(e, i)}
           onDragOver={(e) => onDragOver(e, i)}
@@ -1047,7 +1072,7 @@ useEffect(() => {
         <img
           src={img.src}
           alt="pasted"
-          onClick={() => { if (longPressedIndex !== null) return; setModalIndex(i); }}
+          onClick={() => { if (reorderMode) return; setModalIndex(i); }}
         />
         {/* reorder controls: visible only when reorderMode */}
 {reorderMode && (
@@ -1061,16 +1086,38 @@ useEffect(() => {
   </div>
 )}
 
-        {longPressedIndex === i && (
-          <div className="overlay">
-            <button onClick={() => handleDeleteImage(img.id, i)} aria-label="Delete pick">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-trash" viewBox="0 0 16 16">
-                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
-                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
-                    </svg>
-            </button>
-          </div>
+        {/* small persistent delete button (hidden while reordering) */}
+        {!reorderMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id, i); }}
+            aria-label="Delete pick"
+            title="Delete pick"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border: 'none',
+              display: 'inline-grid',
+              placeItems: 'center',
+              background: 'rgba(255,255,255,0.92)',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+              cursor: 'pointer',
+              zIndex: 60,
+              padding: 0,
+            }}
+          >
+            {/* trash svg */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b82b2b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+              <path d="M10 11v6M14 11v6"></path>
+            </svg>
+          </button>
         )}
+
       </div>
     ))
   )}
