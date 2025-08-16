@@ -17,6 +17,7 @@ import {
   limit,
   setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import './BoardPage.css'; // Assuming you have a CSS file for styles
 
@@ -24,6 +25,11 @@ export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Reorder state (jiggle + drag)
+const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag
+const [draggingIndex, setDraggingIndex] = useState(null);
+const [dragOverIndex, setDragOverIndex] = useState(null);
 
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState('');
@@ -247,6 +253,16 @@ export default function BoardPage({ user }) {
       q,
       (snapshot) => {
         const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // normalize order: if order exists use it; else treat as large number so createdAt sorts next
+        items.sort((a, b) => {
+          const aOrder = (typeof a.order === 'number') ? a.order : Number.MAX_SAFE_INTEGER;
+          const bOrder = (typeof b.order === 'number') ? b.order : Number.MAX_SAFE_INTEGER;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          // fallback: newest first by createdAt
+          const aT = a.createdAt?.seconds || 0;
+          const bT = b.createdAt?.seconds || 0;
+          return bT - aT;
+        });
         setImages(items);
         setImagesLoading(false);
       },
@@ -263,6 +279,100 @@ export default function BoardPage({ user }) {
       imagesUnsubRef.current = null;
     };
   }, [boardId]);
+
+  // -------------------- Reorder helpers --------------------
+const toggleReorder = () => {
+  setReorderMode((s) => {
+    // if turning off, clear drag state
+    if (s) {
+      setDraggingIndex(null);
+      setDragOverIndex(null);
+    }
+    return !s;
+  });
+};
+
+// Desktop HTML5 drag handlers
+const onDragStart = (e, index) => {
+  if (!reorderMode) return;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(index));
+  setDraggingIndex(index);
+  // small transparent drag image to avoid ghost
+  try {
+    const img = document.createElement('img');
+    img.src = '/transparent-1x1.png'; // optional transparent 1x1 in public; optional fallback
+    e.dataTransfer.setDragImage(img, 0, 0);
+  } catch (err) { /* ignore */ }
+};
+
+const onDragOver = (e, index) => {
+  if (!reorderMode) return;
+  e.preventDefault(); // allow drop
+  if (dragOverIndex !== index) setDragOverIndex(index);
+};
+
+const onDrop = async (e, index) => {
+  if (!reorderMode) return;
+  e.preventDefault();
+  const from = Number(e.dataTransfer.getData('text/plain'));
+  const to = index;
+
+  if (Number.isNaN(from)) {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+    return;
+  }
+  if (from === to) {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+    return;
+  }
+
+  // local reorder
+  const newImages = [...images];
+  const [moved] = newImages.splice(from, 1);
+  newImages.splice(to, 0, moved);
+  setImages(newImages);
+
+  // persist immediately
+  await persistOrder(newImages);
+
+  setDraggingIndex(null);
+  setDragOverIndex(null);
+};
+
+const onDragEnd = () => {
+  setDraggingIndex(null);
+  setDragOverIndex(null);
+};
+
+// fallback move-by-button for mobile / accessibility
+const moveImageBy = async (fromIndex, toIndex) => {
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) return;
+  const newImages = [...images];
+  const [moved] = newImages.splice(fromIndex, 1);
+  newImages.splice(toIndex, 0, moved);
+  setImages(newImages);
+  await persistOrder(newImages);
+};
+
+// write 'order' field to Firestore in a batch (index 0 = first)
+const persistOrder = async (orderedImages) => {
+  if (!boardId) return;
+  try {
+    const batch = writeBatch(db);
+    orderedImages.forEach((img, idx) => {
+      const imgRef = doc(db, 'boards', boardId, 'images', img.id);
+      batch.update(imgRef, { order: idx });
+    });
+    await batch.commit();
+    showToast('Order saved', 'success', 1800);
+  } catch (err) {
+    console.error('persistOrder error', err);
+    showToast('Could not persist order — try again', 'error', 3000);
+  }
+};
 
   // -------------------- per-image realtime comment counts --------------------
   useEffect(() => {
@@ -833,7 +943,33 @@ useEffect(() => {
 
         {/* board comments button (restored) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* reorder toggle */}
+          <button
+            aria-pressed={reorderMode}
+            onClick={toggleReorder}
+            title={reorderMode ? "Finish reordering" : "Reorder images"}
+            style={{
+              background: reorderMode ? '#1b999f' : 'transparent',
+              color: reorderMode ? '#fff' : '#333',
+              border: 'none',
+              padding: 8,
+              borderRadius: 8,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            {/* reorder SVG (subtle grid-like icon) */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={reorderMode ? '#fff' : '#333'} strokeWidth="1.8">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          <span style={{ fontSize: 13 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
+          </button>
+         <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             <span style={{ fontSize: 13, color: '#444' }}>{boardCommentsCount}</span>
           </button>
@@ -894,20 +1030,37 @@ useEffect(() => {
   ) : (
     images.map((img, i) => (
       <div
-        key={img.id}
-        onMouseDown={() => startLongPress(i)}
-        onMouseUp={cancelLongPress}
-        onMouseLeave={cancelLongPress}
-        onTouchStart={() => startLongPress(i)}
-        onTouchEnd={cancelLongPress}
-        onTouchCancel={cancelLongPress}
-        className={`image-item ${longPressedIndex === i ? 'active' : ''}`}
+         key={img.id}
+          onMouseDown={() => startLongPress(i)}
+          onMouseUp={cancelLongPress}
+          onMouseLeave={cancelLongPress}
+          onTouchStart={() => startLongPress(i)}
+          onTouchEnd={cancelLongPress}
+          onTouchCancel={cancelLongPress}
+          className={`image-item ${longPressedIndex === i ? 'active' : ''} ${reorderMode ? 'jiggle' : ''} ${draggingIndex === i ? 'dragging' : ''} ${dragOverIndex === i ? 'drag-over' : ''}`}
+          draggable={reorderMode}
+          onDragStart={(e) => onDragStart(e, i)}
+          onDragOver={(e) => onDragOver(e, i)}
+          onDrop={(e) => onDrop(e, i)}
+          onDragEnd={onDragEnd}
       >
         <img
           src={img.src}
           alt="pasted"
           onClick={() => { if (longPressedIndex !== null) return; setModalIndex(i); }}
         />
+        {/* reorder controls: visible only when reorderMode */}
+{reorderMode && (
+  <div className="reorder-controls" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
+    <button onClick={(e)=>{ e.stopPropagation(); moveImageBy(i, Math.max(0,i-1)); }} aria-label="Move left" title="Move earlier" style={{ border:'none', background:'#ffffffcc', padding:6, borderRadius:6, cursor:'pointer' }}>
+      ◀
+    </button>
+    <button onClick={(e)=>{ e.stopPropagation(); moveImageBy(i, Math.min(images.length-1, i+1)); }} aria-label="Move right" title="Move later" style={{ border:'none', background:'#ffffffcc', padding:6, borderRadius:6, cursor:'pointer' }}>
+      ▶
+    </button>
+  </div>
+)}
+
         {longPressedIndex === i && (
           <div className="overlay">
             <button onClick={() => handleDeleteImage(img.id, i)} aria-label="Delete pick">
