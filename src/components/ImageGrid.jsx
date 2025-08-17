@@ -223,6 +223,11 @@ const ImageGrid = ({
         .muuri-item.muuri-item-hidden { z-index:0; }
         .muuri-item.muuri-item-releasing { z-index:2; }
         .muuri-item.muuri-item-dragging { z-index:3; transform-origin:center; }
+        .image.jiggle{
+        /* Reorder / jiggle visuals */
+animation: jiggle 0.9s ease-in-out infinite;
+  transform-origin: 50% 50%;
+        }
       `}</style>
 
       <div className="muuri-wrapper">
@@ -231,7 +236,8 @@ const ImageGrid = ({
             {images.map((img, i) => (
               <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)}>
                 <div className="muuri-content" onClick={() => { if (reorderMode) return; setModalIndex?.(i); }}>
-                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} style={{boxShadow: '4px 4px 5px rgba(0,0,0,0.5)'}}/>
+                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} style={{boxShadow: '4px 4px 5px rgba(0,0,0,0.5)'}} className={`image ${reorderMode ? 'jiggle' : ''}`}
+/>
                 </div>
               </div>
             ))}
