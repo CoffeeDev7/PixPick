@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>grid muuri</title>
+    <style>
+        .grid {
+  position: relative;
+  opacity: 0;
+  transition: opacity 0.8s linear 1s;
+}
+.images-loaded .grid {
+  opacity: 1;
+}
+.item {
+  position: absolute;
+  margin: 5px;
+  z-index: 1;
+}
+.item.muuri-item-hidden {
+  z-index: 0;
+}
+.item.muuri-item-releasing {
+  z-index: 2;
+}
+.item.muuri-item-dragging {
+  z-index: 3;
+}
+.item-content {
+  position: relative;
+  cursor: pointer;
+}
+.item-content > img {
+  display: block;
+  border-radius: 6px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  text-transform: uppercase;
+  transition: opacity 0.6s linear 0.4s;
+}
+.images-loaded .loading {
+  opacity: 0;
+}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web-animations/2.3.2/web-animations.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/muuri@0.9.3/dist/muuri.min.js"></script>
+</head>
+<body><div class="loading">
+  Loading images...
+</div>
+<div class="grid">
+  <div class="item">
+    <div class="item-content">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Mina_H%26M_Rokh_2.jpg/640px-Mina_H%26M_Rokh_2.jpg" width="200" height="300" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="400"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="200"height="305" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="200"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="200"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="200"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="200"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="400"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="400"/height="195" />
+    </div>
+  </div>
+  <div class="item">
+    <div class="item-content">
+      <img src="https://preview.redd.it/telugu-cinema-retro-series-2001-v0-nkzruv1ibe6a1.png?width=1000&format=png&auto=webp&s=c58c1d34aba14e0ebc10215a8b65af875a6f7e80" width="400"height="400" />
+    </div>
+  </div>
+</div> 
+
+<script >
+    var grid = new Muuri('.grid', {
+  dragEnabled: true,
+  layout: {
+    fillGaps: true
+  }
+});
+
+// When all items have loaded refresh their
+// dimensions and layout the grid.
+window.addEventListener('load', function () {
+  grid.refreshItems().layout();
+  // For a little finishing touch, let's fade in
+  // the images after all them have loaded and
+  // they are corrertly positioned.
+  document.body.classList.add('images-loaded');
+});
+</script></body>
+</html>
+
+
+
+
