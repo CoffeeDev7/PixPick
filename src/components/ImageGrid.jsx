@@ -1,173 +1,245 @@
-// ImageGridMuuri.jsx
+// ImageGrid.jsx
 import React, { useEffect, useRef } from "react";
+import Muuri from "muuri";
 
-const ImageGridMuuri = ({ images = [], onImageClick }) => {
+const ImageGrid = ({
+  images = [],
+  reorderMode = false,
+  setModalIndex,
+  // tweak these to control columns + spacing
+  columns = { xl: 6, lg: 5, md: 4, sm: 3, xs: 2 },
+  gap = 8, // gap in px between images (horizontal space between items)
+  storageKey = "pixpick-order"
+}) => {
+  const tag = "[ImageGrid]";
   const gridRef = useRef(null);
   const muuriRef = useRef(null);
+  const mountedRef = useRef(true);
 
+  // wait for images to settle
   const waitForImages = (container) => {
     const imgs = Array.from(container.querySelectorAll("img"));
     if (!imgs.length) return Promise.resolve();
-    const promises = imgs.map((img) => {
-      if (img.complete) return Promise.resolve();
-      return new Promise((res) => {
-        const onFinish = () => {
-          img.removeEventListener("load", onFinish);
-          img.removeEventListener("error", onFinish);
-          res();
-        };
-        img.addEventListener("load", onFinish);
-        img.addEventListener("error", onFinish);
-      });
-    });
-    return Promise.all(promises);
+    return Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise((res) => {
+              const onFinish = () => {
+                img.removeEventListener("load", onFinish);
+                img.removeEventListener("error", onFinish);
+                res();
+              };
+              img.addEventListener("load", onFinish);
+              img.addEventListener("error", onFinish);
+            })
+      )
+    );
   };
 
+  // Utility: create Muuri with given dragEnabled flag
+  const createMuuri = (dragEnabled = false) => {
+    if (!gridRef.current) {
+      console.warn(`${tag} createMuuri: no gridRef`);
+      return null;
+    }
+    console.debug(`${tag} createMuuri: dragEnabled=${dragEnabled}`);
+    const inst = new Muuri(gridRef.current, {
+      dragEnabled,
+      layout: { fillGaps: true },
+      // we rely on full-drag here, but you can add handle if desired:
+      // dragStartPredicate: { handle: ".drag-handle" }
+    });
+
+    // ensure it recalculates on window resize (helps responsive widths)
+    const onResize = () => {
+      try {
+        inst.refreshItems().layout();
+      } catch (e) {
+        console.warn(`${tag} resize layout failed`, e);
+      }
+    };
+    window.addEventListener("resize", onResize);
+    // attach cleanup reference for later removal
+    inst.__pixpick_onResize = onResize;
+
+    return inst;
+  };
+
+  // Create initial muuri (or refresh)
   useEffect(() => {
-    let mounted = true;
-    let MuuriModule = null;
-    if (typeof window === "undefined") return;
+    mountedRef.current = true;
 
     const init = async () => {
       if (!gridRef.current) return;
-      try {
-        const mod = await import("muuri");
-        MuuriModule = mod?.default ?? mod;
-      } catch (err) {
-        console.error("Failed to import Muuri:", err);
-        return;
-      }
-
+      console.debug(`${tag} init: waiting images...`);
       await waitForImages(gridRef.current);
-      if (!mounted) return;
+      if (!mountedRef.current) return;
 
       if (!muuriRef.current) {
-        muuriRef.current = new MuuriModule(gridRef.current, {
-          dragEnabled: true,
-          layout: { fillGaps: true },
-        });
+        muuriRef.current = createMuuri(reorderMode);
+        console.debug(`${tag} init: created muuri`, !!muuriRef.current);
+        // restore saved order safely using Muuri Items
+        try {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const ids = JSON.parse(saved);
+            const items = muuriRef.current.getItems();
+            const idToItem = new Map(items.map(it => [it.getElement().dataset.id, it]));
+            const orderedItems = ids.map(id => idToItem.get(String(id))).filter(Boolean);
+            if (orderedItems.length) {
+              muuriRef.current.sort(orderedItems);
+              console.debug(`${tag} init: restored saved order (${orderedItems.length})`);
+            }
+          }
+        } catch (e) {
+          console.warn(`${tag} init restore error:`, e);
+        }
+
+        try {
+          muuriRef.current.refreshItems().layout();
+          console.debug(`${tag} initial refresh/layout OK`);
+        } catch (e) {
+          console.warn(`${tag} initial layout failed:`, e);
+        }
       } else {
-        muuriRef.current.refreshItems().layout();
+        try {
+          muuriRef.current.refreshItems().layout();
+        } catch (e) {
+          console.warn(`${tag} refresh failed`, e);
+        }
       }
-
-      try {
-        muuriRef.current.refreshItems().layout();
-      } catch (e) {
-        console.warn("Muuri layout error:", e);
-      }
-
       document.body.classList.add("images-loaded");
-      document.body.style.overflow = "";
     };
 
     init();
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       try {
         if (muuriRef.current) {
+          // remove resize listener
+          const fn = muuriRef.current.__pixpick_onResize;
+          if (fn) window.removeEventListener("resize", fn);
           muuriRef.current.destroy();
           muuriRef.current = null;
         }
       } catch (e) {
-        console.warn("Muuri destroy error:", e);
+        console.warn(`${tag} destroy error`, e);
       }
     };
-  }, [images]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images]); // re-run if images array identity changes
+
+  // Recreate Muuri when reorderMode changes (safe restore)
+  useEffect(() => {
+    if (!gridRef.current) return;
+
+    // if muuri not created yet, create with current flag and return
+    if (!muuriRef.current) {
+      muuriRef.current = createMuuri(reorderMode);
+      try { muuriRef.current.refreshItems().layout(); } catch (e) { /* ignore */ }
+      return;
+    }
+
+    try {
+      // save current order (ids)
+      const currentIds = muuriRef.current.getItems().map(it => it.getElement().dataset.id);
+      console.debug(`${tag} reorder toggle: saving order`, currentIds);
+
+      // destroy current instance (and remove resize listener)
+      const onResizeFn = muuriRef.current.__pixpick_onResize;
+      if (onResizeFn) window.removeEventListener("resize", onResizeFn);
+      muuriRef.current.destroy();
+      muuriRef.current = null;
+      console.debug(`${tag} reorder toggle: destroyed old instance`);
+
+      // create new one with updated dragEnabled
+      muuriRef.current = createMuuri(reorderMode);
+      // restore order using Muuri Item objects
+      const items = muuriRef.current.getItems();
+      const idToItem = new Map(items.map(it => [it.getElement().dataset.id, it]));
+      const orderedItems = currentIds.map(id => idToItem.get(String(id))).filter(Boolean);
+      if (orderedItems.length) {
+        muuriRef.current.sort(orderedItems);
+        console.debug(`${tag} reorder toggle: restored order after recreate`);
+      } else {
+        console.debug(`${tag} reorder toggle: no items to restore`);
+      }
+      muuriRef.current.refreshItems().layout();
+    } catch (e) {
+      console.warn(`${tag} recreate on reorderMode failed:`, e);
+      // fallback: create at least
+      if (!muuriRef.current) {
+        muuriRef.current = createMuuri(reorderMode);
+        try { muuriRef.current.refreshItems().layout(); } catch (err) { /* ignore */ }
+      }
+    }
+  }, [reorderMode]);
+
+  // ---- STABLE CSS: use margin = gap/2 so horizontal gutter math becomes simple ----
+  // item margin = gap/2 -> per-item horizontal margin contribution = gap (left+right sum)
+  // item width = (100% - columns * gap) / columns
+  const g = Number(gap);
+  const colXL = columns.xl ?? 6;
+  const colLG = columns.lg ?? 5;
+  const colMD = columns.md ?? 4;
+  const colSM = columns.sm ?? 3;
+  const colXS = columns.xs ?? 2;
 
   return (
     <>
       <style>{`
-        .muuri-grid {
-          position: relative;
-          width: 100%;
-          opacity: 0;
-          transition: opacity 0.45s ease 0s;
-        }
-        .images-loaded .muuri-grid { opacity: 1; }
+        /* Scoped muuri styles (important: avoid global collisions) */
+        .muuri-wrapper { width:100%; }
+        .muuri-scroll { width:100%; }
 
-        /* item spacing and box-sizing */
-        .muuri-item {
-          position: absolute;
-          margin: 8px;
-          z-index: 1;
-          box-sizing: border-box;
-        }
+        .muuri-grid { position: relative; width: 100%; opacity: 1; transition: opacity .25s ease; }
+        .muuri-item { position: absolute; margin: ${g / 2}px; z-index: 1; box-sizing: border-box; }
 
-        /* ----- Simplified responsive widths ----- */
-        /* Desktop: 6 columns */
-        @media (min-width: 1200px) {
-          .muuri-item { width: calc((100% - 16px*6) / 6); } /* rough gutters handled by margin */
+        /* width formula: each item contributes gap px of margins in total,
+           so total horizontal used by margins = columns * gap.
+           width per item = (100% - columns * gap) / columns */
+        @media (min-width: 1100px) {
+          .muuri-item { width: calc((100% - (${colXL} * ${g}px)) / ${colXL}); }
         }
-
-        /* Large tablet / small desktop: 5 columns */
-        @media (min-width: 992px) and (max-width: 1199px) {
-          .muuri-item { width: calc((100% - 16px*5) / 5); }
+        @media (min-width: 992px) and (max-width: 1099px) {
+          .muuri-item { width: calc((100% - (${colLG} * ${g}px)) / ${colLG}); }
         }
-
-        /* Tablet: 4 columns */
         @media (min-width: 768px) and (max-width: 991px) {
-          .muuri-item { width: calc((100% - 16px*4) / 4); }
+          .muuri-item { width: calc((100% - (${colMD} * ${g}px)) / ${colMD}); }
         }
-
-        /* Small tablet / large phone: 3 columns */
         @media (min-width: 480px) and (max-width: 767px) {
-          .muuri-item { width: calc((100% - 16px*3) / 3); }
+          .muuri-item { width: calc((100% - (${colSM} * ${g}px)) / ${colSM}); }
         }
-
-        /* Mobile: FORCE 2 columns for anything < 480px */
         @media (max-width: 479px) {
-          .muuri-item { width: calc(50% - 16px); } /* 2 columns with margin accounting */
+          .muuri-item { width: calc((100% - (${colXS} * ${g}px)) / ${colXS}); }
         }
 
-        .muuri-content {
-          position: relative;
-          cursor: grab;
-          width: 100%;
-          height: 100%;
-        }
-        .muuri-content > img {
-          display: block;
-          width: 100%;
-          height: auto;
-          border-radius: 8px;
-          user-select: none;
-          -webkit-user-drag: none;
-        }
+        .muuri-content { position: relative; width: 100%; height: 100%; }
+        .muuri-content > img { display:block; width:100%; height:auto; border-radius:8px; user-select:none; -webkit-user-drag:none; }
 
-        .muuri-item.muuri-item-hidden { z-index: 0; }
-        .muuri-item.muuri-item-releasing { z-index: 2; }
-        .muuri-item.muuri-item-dragging { z-index: 3; transform-origin: center; }
-
-        .muuri-loading {
-          position: fixed;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          pointer-events: none;
-          z-index: 9999;
-          transition: opacity 0.3s ease;
-        }
-        .images-loaded .muuri-loading { opacity: 0; }
+        /* keep dragging visuals */
+        .muuri-item.muuri-item-hidden { z-index:0; }
+        .muuri-item.muuri-item-releasing { z-index:2; }
+        .muuri-item.muuri-item-dragging { z-index:3; transform-origin:center; }
       `}</style>
 
-      <div className="muuri-loading">Loading images…</div>
-
-      <div className="muuri-grid" ref={gridRef}>
-        {images.map((img, i) => (
-          <div className="muuri-item" key={img.id ?? i}>
-            <div
-              className="muuri-content"
-              onClick={() => onImageClick?.(i)}
-            >
-              <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} />
-            </div>
+      <div className="muuri-wrapper">
+        <div className="muuri-scroll">
+          <div className="muuri-grid" ref={gridRef}>
+            {images.map((img, i) => (
+              <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)}>
+                <div className="muuri-content" onClick={() => { if (reorderMode) return; setModalIndex?.(i); }}>
+                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} />
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </>
   );
 };
 
-export default ImageGridMuuri;
+export default ImageGrid;

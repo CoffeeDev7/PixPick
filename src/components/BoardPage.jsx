@@ -1040,6 +1040,7 @@ const cancelLongPress = () => {
         images={images}
         imagesLoading={imagesLoading}
         reorderMode={reorderMode}
+        setReorderMode={setReorderMode}
         draggingIndex={draggingIndex}
         dragOverIndex={dragOverIndex}
         startLongPress={startLongPress}
