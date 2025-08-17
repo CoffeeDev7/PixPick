@@ -20,6 +20,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import './BoardPage.css'; // Assuming you have a CSS file for styles
+import ImageGrid from './ImageGrid'; // Import the ImageGrid component
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -1035,84 +1036,22 @@ const cancelLongPress = () => {
       <textarea ref={pasteRef} placeholder="Long press and tap Paste" onPaste={handlePaste} rows={2} style={{ display: 'block', width: '100%', height: '45px', border: '2px dashed #4caf50', background: '#eaffea', fontSize: '16px', marginBottom: '16px', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
 
       {/* Images grid */}
-      <div className="image-grid">
-          {imagesLoading ? (
-            Array.from({ length: 12 }).map((_, idx) => (
-              <div key={`skeleton-${idx}`} className="skeleton-wrapper">
-                <div className="skeleton-dark rect" />
-              </div>
-            ))
-          ) : images.length === 0 ? (
-            <div className="empty-grid">
-              <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="8" y1="15" x2="16" y2="15" />
-                      <line x1="9" y1="9" x2="9.01" y2="9" />
-                      <line x1="15" y1="9" x2="15.01" y2="9" />
-                    </svg>
-              There aren't any picks in this board yet.
-            </div>
-          ) : (
-            images.map((img, i) => (
-              <div
-                key={img.id}
-                  onMouseDown={() => startLongPress(i)}
-                  onMouseUp={cancelLongPress}
-                  onMouseLeave={cancelLongPress}
-                  onTouchStart={() => startLongPress(i)}
-                  onTouchEnd={cancelLongPress}
-                  onTouchCancel={cancelLongPress}
-                  className={`image-item ${reorderMode ? 'jiggle' : ''} ${draggingIndex === i ? 'dragging' : ''} ${dragOverIndex === i ? 'drag-over' : ''}`}
-                  draggable={reorderMode}
-                  onDragStart={(e) => onDragStart(e, i)}
-                  onDragOver={(e) => onDragOver(e, i)}
-                  onDrop={(e) => onDrop(e, i)}
-                  onDragEnd={onDragEnd}
-              >
-                <img
-                  src={img.src}
-                  alt="pasted"
-                  onClick={() => { if (reorderMode) return; setModalIndex(i); }}
-                />
-                {/* reorder controls: visible only when reorderMode */}
+      <ImageGrid
+        images={images}
+        imagesLoading={imagesLoading}
+        reorderMode={reorderMode}
+        draggingIndex={draggingIndex}
+        dragOverIndex={dragOverIndex}
+        startLongPress={startLongPress}
+        cancelLongPress={cancelLongPress}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        setModalIndex={setModalIndex}
+        handleDeleteImage={handleDeleteImage}
+      />
 
-
-                {/* small persistent delete button (hidden while reordering) */}
-                {!reorderMode && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id, i); }}
-                    aria-label="Delete pick"
-                    title="Delete pick"
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      border: 'none',
-                      display: 'inline-grid',
-                      placeItems: 'center',
-                      background: 'rgba(255,255,255,0.92)',
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-                      cursor: 'pointer',
-                      zIndex: 60,
-                      padding: 0,
-                    }}
-                  >
-                    {/* trash svg */}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b82b2b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                      <path d="M10 11v6M14 11v6"></path>
-                    </svg>
-                  </button>
-                )}
-
-              </div>
-            ))
-          )}
-</div>
 
       {/* Modal */}
       {modalIndex !== null && (
