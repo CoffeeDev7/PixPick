@@ -231,7 +231,7 @@ const ImageGrid = ({
             {images.map((img, i) => (
               <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)}>
                 <div className="muuri-content" onClick={() => { if (reorderMode) return; setModalIndex?.(i); }}>
-                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} />
+                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} style={{boxShadow: '4px 4px 5px rgba(0,0,0,0.5)'}}/>
                 </div>
               </div>
             ))}
