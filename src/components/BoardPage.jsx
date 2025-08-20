@@ -668,6 +668,42 @@ const handlePaste = async (event) => {
   }
 };
 
+const handleDrop = async (event) => {
+  event.preventDefault();
+  let handled = false;
+
+  // 1. Handle file drops (like dragging an image from desktop)
+  if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+    for (let file of event.dataTransfer.files) {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          await saveImageToFirestore(e.target.result);
+        };
+        reader.readAsDataURL(file);
+        handled = true;
+      }
+    }
+  }
+
+  // 2. Handle text/URLs (like dragging from another tab)
+  const text = event.dataTransfer.getData("text") || "";
+  if (text) {
+    // Reuse the same logic you already wrote for paste:
+    await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
+    handled = true;
+  }
+
+  if (handled && event.target) {
+    event.target.value = "";
+  }
+};
+
+const handleDragOver = (event) => {
+  // Required to allow dropping
+  event.preventDefault();
+};
+
 
   // -------------------- comments handling --------------------
   // open comments modal for a specific image (by index)
@@ -1097,7 +1133,30 @@ const cancelLongPress = () => {
       </div>
 
       {/* Paste box */}
-      <textarea ref={pasteRef} placeholder="Long press and tap Paste" onPaste={handlePaste} rows={2} style={{ display: 'block', width: '100%', height: '45px', border: '2px dashed #4caf50', background: '#eaffea', fontSize: '16px', marginBottom: '16px', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
+      <textarea
+  ref={pasteRef}
+  placeholder="Paste or Drag images/links here"
+  onPaste={handlePaste}
+  onDrop={handleDrop}
+  onDragOver={handleDragOver}
+  onDragLeave={handleDragLeave}
+  rows={4}   // bigger
+  style={{
+    display: 'block',
+    width: '100%',
+    height: '70px', // bigger box
+    border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
+    background: dragActive ? '#e3f2fd' : '#eaffea',
+    fontSize: '16px',
+    marginBottom: '16px',
+    padding: '10px',
+    borderRadius: '8px',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s ease'
+  }}
+/>
+
+
 
       {/* Images grid */}
       <ImageGrid
