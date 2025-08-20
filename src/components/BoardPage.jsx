@@ -31,6 +31,7 @@ export default function BoardPage({ user }) {
 const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag
 const [draggingIndex, setDraggingIndex] = useState(null);
 const [dragOverIndex, setDragOverIndex] = useState(null);
+const [dragActive, setDragActive] = useState(false);
 
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState('');
@@ -700,9 +701,11 @@ const handleDrop = async (event) => {
 };
 
 const handleDragOver = (event) => {
-  // Required to allow dropping
   event.preventDefault();
+  setDragActive(true);
 };
+
+const handleDragLeave = (event) => setDragActive(false);
 
 
   // -------------------- comments handling --------------------
