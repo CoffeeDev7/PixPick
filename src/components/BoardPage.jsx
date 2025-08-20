@@ -564,46 +564,110 @@ useEffect(() => {
     }
   };
 
-  const handlePaste = async (event) => {
-    let handled = false;
-    const text = event.clipboardData.getData('text');
+  // helper: returns true for "likely image" urls (even if no file extension)
+function isLikelyImageUrl(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    // common hosts Google uses for thumbnails / image hosting
+    const proxyHosts = /(gstatic\.com|googleusercontent\.com|ggpht\.com|bp\.blogspot\.com|lh3\.googleusercontent\.com|cdn\.instagram\.com)/i;
+    if (proxyHosts.test(u.hostname)) return true;
 
-    if (event.clipboardData && event.clipboardData.items) {
-      for (let item of event.clipboardData.items) {
-        if (item.type.indexOf('image') === 0) {
-          const file = item.getAsFile();
-          const reader = new FileReader();
-          reader.onload = async function (e) {
-            await saveImageToFirestore(e.target.result);
-          };
-          reader.readAsDataURL(file);
-          handled = true;
-        }
+    // google image redirect param or thumbnail param
+    if (/[?&](imgurl|imgrefurl|q|tbn|source)=/i.test(u.search)) return true;
+
+    // fallback: extension check
+    if (/\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i.test(u.pathname + u.search)) return true;
+  } catch (e) {
+    // not a valid URL
+  }
+  return false;
+}
+
+// Replace your handler with this
+const handlePaste = async (event) => {
+  let handled = false;
+
+  // If image file(s) are present in clipboard items, handle them first
+  if (event.clipboardData && event.clipboardData.items) {
+    for (let item of event.clipboardData.items) {
+      if (item.type && item.type.indexOf('image') === 0) {
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+          // existing function that uploads dataURLs
+          await saveImageToFirestore(e.target.result);
+        };
+        reader.readAsDataURL(file);
+        handled = true;
       }
     }
+  }
 
-    const isGoogleRedirect = /google\.com\/imgres.*[?&]imgurl=/i.test(text);
-    const isGoogleImageProxy = /images\.app\.goo\.gl/i.test(text);
-    const isBrokenGoogleImageCopy = /google\.com\/url\?sa=i/i.test(text);
-    const isDirectImageLink = /^https?:\/\/.+\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(text);
+  // text fallback (URL or data URL)
+  const text = event.clipboardData.getData('text') || '';
 
-    if (isGoogleImageProxy) {
-      showToast("⚠️ Can't preview this Google image link. Open it in browser, then copy image directly.");
-      handled = true;
-    } else if (isBrokenGoogleImageCopy) {
-      showToast("⚠️ 'Copy Link Address' from Google Images doesn't work. Try 'Copy Image or Copy Image Address' instead.");
-      handled = true;
-    } else if (isGoogleRedirect) {
-      showToast("⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'.");
-      handled = true;
-    } else if (isDirectImageLink || text.startsWith('data:image/')) {
+  const isDataUrl = text.startsWith('data:image/');
+  const isDirectImageLink = /^https?:\/\/.+\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(text);
+  const isGoogleAppProxy = /images\.app\.goo\.gl/i.test(text);
+  const isGoogleImgresRedirect = /google\.com\/imgres.*[?&]imgurl=/i.test(text);
+  const isBrokenGoogleImageCopy = /google\.com\/url\?sa=i/i.test(text);
+  const isLikelyImage = isLikelyImageUrl(text);
+
+  if (isGoogleAppProxy) {
+    showToast("⚠️ Can't preview this Google image link. Open it in browser, then copy image directly.");
+    handled = true;
+  } else if (isBrokenGoogleImageCopy) {
+    showToast("⚠️ 'Copy Link Address' from Google Images doesn't work. Try 'Copy Image' or 'Copy Image Address' instead.");
+    handled = true;
+  } else if (isGoogleImgresRedirect) {
+    showToast("⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'.");
+    handled = true;
+  } else if (isDataUrl) {
+    await saveImageToFirestore(text);
+    handled = true;
+  } else if (isDirectImageLink) {
+    // direct link with extension — you were already handling this
+    await saveImageToFirestore(text);
+    handled = true;
+  } else if (isLikelyImage) {
+    // NEW: treat gstatic / googleusercontent / tbn-style URLs as images
+    // Prefer server-side import (recommended) to avoid CORS & hotlink issues.
+    try {
+      // Try an in-client quick validation using Image to see if it loads
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('image failed to load'));
+        img.src = text;
+        // in some browsers this will still "load" even if CORS would block canvas ops; it's just a presence check
+      });
+
+      // At this point the URL loads — use a URL-import path (server proxy) to persist it.
+      // Implement saveImageUrlToFirestore(url) to either:
+      //  - call your server /import endpoint which fetches the remote image and uploads to Firebase Storage
+      //  - OR try client fetch->blob (may hit CORS)
       await saveImageToFirestore(text);
       handled = true;
+    } catch (err) {
+      // image didn't load in the client — still attempt server-side import as a fallback
+      try {
+        await saveImageUrlToFirestore(text); // server should fetch it
+        handled = true;
+      } catch (err2) {
+        console.warn('image import failed:', err2);
+        showToast("⚠️ Couldn't import that image URL. Open the image in a new tab and copy the image directly, or try 'Open image' → 'Copy image address'.");
+        handled = true;
+      }
     }
+  }
 
-    if (handled) event.preventDefault();
-    event.target.value = '';
-  };
+  if (handled) {
+    event.preventDefault();         // stop default paste into textarea
+    if (event.target) event.target.value = '';
+  }
+};
+
 
   // -------------------- comments handling --------------------
   // open comments modal for a specific image (by index)
