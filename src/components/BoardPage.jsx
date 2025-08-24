@@ -674,9 +674,9 @@ const handleDrop = async (event) => {
   let handled = false;
 
   // 1. Handle file drops (like dragging an image from desktop)
-  if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
     for (let file of event.dataTransfer.files) {
-      if (file.type.startsWith("image/")) {
+      if (file.type && file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = async (e) => {
           await saveImageToFirestore(e.target.result);
@@ -688,12 +688,19 @@ const handleDrop = async (event) => {
   }
 
   // 2. Handle text/URLs (like dragging from another tab)
-  const text = event.dataTransfer.getData("text") || "";
-  if (text) {
-    // Reuse the same logic you already wrote for paste:
-    await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
-    handled = true;
+  // NOTE: if we already handled files above, skip text to avoid duplicates
+  if (!handled) {
+    const text = event.dataTransfer.getData("text") || "";
+    if (text) {
+      // Reuse the same logic you already wrote for paste:
+      await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
+      handled = true;
+    }
   }
+
+  // cleanup UI state & input value
+  setDragActive(false);
+  try { if (event.dataTransfer) event.dataTransfer.clearData(); } catch (e) { /* ignore */ }
 
   if (handled && event.target) {
     event.target.value = "";
@@ -705,7 +712,10 @@ const handleDragOver = (event) => {
   setDragActive(true);
 };
 
-const handleDragLeave = (event) => setDragActive(false);
+const handleDragLeave = (event) => {
+  // classic case: when leaving the drop area reset the visual flag
+  setDragActive(false);
+};
 
 
   // -------------------- comments handling --------------------
