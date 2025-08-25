@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase"; // adjust path if needed
+import "./CreateBoardModal.css"; // optional: for custom styles
+import confetti from "canvas-confetti";
 
 export default function CreateBoardModal({ user, onCreate }) {
   const [title, setTitle] = useState("");
@@ -30,6 +32,13 @@ export default function CreateBoardModal({ user, onCreate }) {
       setTitle("");
       setIsOpen(false);
       onCreate();
+
+      //give confetti
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+      });
     } catch (error) {
       console.error("Error creating board:", error);
     }
@@ -39,33 +48,8 @@ export default function CreateBoardModal({ user, onCreate }) {
     <>
       {/* "+" button aligned next to title */}
       <button
+        className="create-board-btn"
         onClick={() => setIsOpen(true)}
-        style={{
-          marginLeft: "8px",
-          width: "36px",
-          height: "36px",
-          borderRadius: "50%",
-          backgroundColor: "#1b999f",
-          border: "1px solid #e0e0e0",
-          fontSize: "20px",
-          fontWeight: "bold",
-          cursor: "pointer",
-          boxShadow: "0 2px 4px rgba(27,153,159,0.18)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s ease",
-          verticalAlign: "middle",
-          color: "#fff",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#e9ecef";
-          e.currentTarget.style.boxShadow = "0 3px 6px rgba(0, 0, 0, 0.12)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#f8f9fa";
-          e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
-        }}
       >
         +
       </button>
@@ -91,16 +75,17 @@ export default function CreateBoardModal({ user, onCreate }) {
         >
           <div
             style={{
-              background: "#fff",
+              background: "linear-gradient(90deg,rgba(27, 153, 159, 1) 0%, rgba(87, 173, 199, 1) 50%, rgba(238, 108, 77, 1) 100%)",
+              // from cssgradient.io
               padding: "20px",
-              borderRadius: "8px",
+              borderRadius: "34px",
               width: "90%",
               maxWidth: "400px",
               boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ marginBottom: "12px" }}>Create New Board</h3>
+            <h3 style={{ marginBottom: "12px" }}>Create New Board ✨</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -118,7 +103,7 @@ export default function CreateBoardModal({ user, onCreate }) {
                   flex: 1,
                   padding: "12px",
                   fontSize: "16px",
-                  borderRadius: "8px",
+                  borderRadius: "83px",
                   border: "1px solid #ccc",
                   outline: "none",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
@@ -128,19 +113,20 @@ export default function CreateBoardModal({ user, onCreate }) {
                 type="submit"
                 style={{
                   padding: "0 16px",
-                  borderRadius: "8px",
+                  borderRadius: "81px",
                   backgroundColor: "#ee6c4d",
                   border: "none",
                   color: "white",
                   fontSize: "16px",
                   cursor: "pointer",
                   transition: "background 0.2s ease",
+                  outline: "none",
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = "#3b8dd9")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#4cafef")
+                  (e.currentTarget.style.backgroundColor = "#ee6c4d")
                 }
               >
                 Create

@@ -12,6 +12,8 @@ import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
+import { Toaster, toast } from "react-hot-toast";
+import confetti from "canvas-confetti";
 
 export default function App() {
   const [user, setUser] = useState(null);

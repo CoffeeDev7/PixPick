@@ -1,0 +1,47 @@
+.create-board-btn {
+  margin-left: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #1b999f;
+  border: 1px solid #e0e0e0;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(27, 153, 159, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  vertical-align: middle;
+  color: #fff;
+}
+
+/* Hover = lighter shade + glow */
+.create-board-btn:hover {
+  background-color: #24b0b7; /* lighter teal */
+  box-shadow: 0 4px 8px rgba(27, 153, 159, 0.4);
+  transform: scale(1.1);
+  outline:none;
+  border: none;
+}
+
+/* Active (when clicked) */
+.create-board-btn:active {
+  background-color: #178589;
+  transform: scale(0.95);
+}
+
+.create-board-btn:hover {
+  animation: wiggle 0.4s ease;
+}
+
+@keyframes wiggle {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
+}
+
+
