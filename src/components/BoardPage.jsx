@@ -1114,6 +1114,7 @@ const handleDragLeave = (event) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showBoardMenu]);
+  const isMobile = window.innerWidth < 768;
 
   return (
     <div style={{ marginTop: '0px' }} className='boardpage'>
@@ -1254,14 +1255,14 @@ const handleDragLeave = (event) => {
           <img src={images[modalIndex]?.src} alt="Full view" style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.4)', transition: 'transform 0.3s ease' }} />
 
           {/* toolbar under the image inside the modal: Comment button (keeps same visual position as before) */}
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: isMobile? '40%':'50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
             <button aria-label="Comments" onClick={() => openCommentsForIndex(modalIndex)} style={{ background: 'rgba(0,0,0,0.6)', border: 'none', padding: '8px 12px', color: '#fff', borderRadius: 999, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
               <span style={{ fontSize: 14 }}>{commentCounts[images[modalIndex]?.id] ?? 0}</span>
             </button>
           </div>
           {/* Trash icon */}
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: '55%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: isMobile? '60%':'55%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
             <button aria-label="Delete" onClick={() => handleDeleteImage(images[modalIndex]?.id, modalIndex)} style={{ background: 'rgba(0,0,0,0.6)', border: 'none', padding: '8px 12px', color: '#fff', borderRadius: 999, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M19 6l-1 14H6L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" /></svg>
             </button>
