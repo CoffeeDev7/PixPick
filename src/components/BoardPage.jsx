@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import {
   doc,
+  documentId,
   getDoc,
   getDocs,
   collection,
@@ -113,26 +114,36 @@ const [dragActive, setDragActive] = useState(false);
   }
 
   async function getProfileCached(uid) {
-    try {
-      const TTL = 1000 * 60 * 60 * 24; // 24h
-      const now = Date.now();
-      const raw = localStorage.getItem(`profile_${uid}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed._cachedAt && now - parsed._cachedAt < TTL) {
+  try {
+    if (!uid) return { displayName: 'Unknown', photoURL: '' };
+    const TTL = 1000 * 60 * 60 * 24; // 24h
+    const now = Date.now();
+    const key = `profile_${uid}`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed._cachedAt && now - parsed._cachedAt < TTL) {
+        // use cached only if it has at least a displayName or a non-empty photoURL
+        if (parsed.data && (parsed.data.displayName || parsed.data.photoURL)) {
+          // quick optimistic return (fast UI)
           return parsed.data;
         }
       }
-      const snap = await getDoc(doc(db, 'users', uid));
-      const data = snap.exists() ? snap.data() : { displayName: 'Unknown', photoURL: '' };
-      const toStore = { displayName: data.displayName || 'Unknown', photoURL: data.photoURL || '' };
-      localStorage.setItem(`profile_${uid}`, JSON.stringify({ _cachedAt: now, data: toStore }));
-      return toStore;
-    } catch (err) {
-      console.error('getProfileCached err', err);
-      return { displayName: 'Unknown', photoURL: '' };
     }
+
+    // fetch from Firestore
+    const snap = await getDoc(doc(db, 'users', uid));
+    const data = snap.exists() ? snap.data() : { displayName: 'Unknown', photoURL: '' };
+    const serverUpdatedAt = snap.exists() ? data.updatedAt?.seconds || null : null;
+    const toStore = { displayName: data.displayName || 'Unknown', photoURL: data.photoURL || '' };
+    localStorage.setItem(key, JSON.stringify({ _cachedAt: now, serverUpdatedAt, data: toStore }));
+    return toStore;
+  } catch (err) {
+    console.error('getProfileCached err', err);
+    return { displayName: 'Unknown', photoURL: '' };
   }
+}
+
 
   const handleBack = () => {
     if (location.state && location.state.from) {
@@ -155,35 +166,136 @@ const [dragActive, setDragActive] = useState(false);
     navigate('/');
   };
 
-  // -------------------- collaborators UIDs --------------------
-  useEffect(() => {
-    async function fetchCollaboratorAndOwnerUIDs() {
-      if (!boardId) return;
+// helper: split into chunks (Firestore 'in' supports up to 10)
+function chunkArray(arr, n = 10) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
 
-      const boardRef = doc(db, 'boards', boardId);
-      const boardSnap = await getDoc(boardRef);
-      if (!boardSnap.exists()) return;
-
-      const data = boardSnap.data();
-      const ownerUID = data.owner || data.ownerId || null;
-
-      const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
-      const collaboratorsSnap = await getDocs(collaboratorsRef);
-      const collaboratorIDs = collaboratorsSnap.docs.map((d) => d.id);
-
-      const allUIDs = Array.from(new Set([ownerUID, ...collaboratorIDs].filter(Boolean)));
-      setCollaboratorUIDs(allUIDs);
-
-      // update lastOpenedAt to signal board was opened (useful for the "last opened" display)
-      try {
-        await updateDoc(boardRef, { lastOpenedAt: serverTimestamp() });
-      } catch (err) {
-        // ignore if user can't write
-      }
+// resolve owner id if owner stored as email (optional safety)
+async function resolveOwnerId(maybeOwner) {
+  if (!maybeOwner) return null;
+  if (typeof maybeOwner === 'string' && maybeOwner.includes('@')) {
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', maybeOwner), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) return snap.docs[0].id;
+      return maybeOwner;
+    } catch (err) {
+      console.warn('resolveOwnerId failed', err);
+      return maybeOwner;
     }
+  }
+  return maybeOwner;
+}
 
-    fetchCollaboratorAndOwnerUIDs();
-  }, [boardId]);
+// Combined realtime listeners: board doc (title/updatedAt) + collaborators subcollection (live)
+// and then fast batched profile fetch + cached-first UI.
+useEffect(() => {
+  if (!boardId) return;
+  let mounted = true;
+  const boardRef = doc(db, 'boards', boardId);
+  const collabsRef = collection(db, 'boards', boardId, 'collaborators');
+
+  // keep owner value up-to-date for including in UID list
+  const ownerRef = { current: null };
+
+  // board listener (title and timestamps)
+  const unsubBoard = onSnapshot(boardRef, (snap) => {
+    if (!mounted || !snap.exists()) return;
+    const data = snap.data();
+    setBoardTitle(data.title || '(Untitled)');
+    ownerRef.current = data.owner || data.ownerId || null;
+    const ts = data.updatedAt || data.createdAt || null;
+    setLastOpenedShort(timeAgoShort(ts));
+  });
+
+  // collaborators listener
+  const unsubCollabs = onSnapshot(collabsRef, (snap) => {
+    if (!mounted) return;
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setCollaborators(docs);
+
+    // build collaboratorUIDs including owner (resolve email->uid if needed)
+    (async () => {
+      const collabIDs = docs.map(d => d.id);
+      let all = Array.from(new Set([...collabIDs]));
+      if (ownerRef.current && !all.includes(ownerRef.current)) {
+        // resolve owner if it's an email string stored in legacy data
+        const maybeResolved = ownerRef.current && ownerRef.current.includes('@') ? await resolveOwnerId(ownerRef.current) : ownerRef.current;
+        if (maybeResolved) all.push(maybeResolved);
+      }
+      if (mounted) setCollaboratorUIDs(all);
+    })();
+  });
+
+  return () => {
+    mounted = false;
+    unsubBoard && unsubBoard();
+    unsubCollabs && unsubCollabs();
+  };
+}, [boardId]);
+
+// Profiles: cached-first rendering, then batch-fetch from users collection using documentId() in chunks
+useEffect(() => {
+  if (!collaboratorUIDs || collaboratorUIDs.length === 0) {
+    setcollaboratorProfiles([]);
+    return;
+  }
+  let cancelled = false;
+  const now = Date.now();
+  const TTL = 1000 * 60 * 60 * 24; // 24h
+
+  // 1) immediate cached-first result
+  const cachedList = collaboratorUIDs.map(uid => {
+    try {
+      const raw = localStorage.getItem(`profile_${uid}`);
+      if (!raw) return { uid, displayName: 'Unknown', photoURL: '' };
+      const parsed = JSON.parse(raw);
+      if (parsed._cachedAt && now - parsed._cachedAt < TTL && parsed.data) {
+        if (parsed.data.displayName || parsed.data.photoURL) return { uid, ...parsed.data };
+      }
+      return { uid, displayName: 'Unknown', photoURL: '' };
+    } catch (e) {
+      return { uid, displayName: 'Unknown', photoURL: '' };
+    }
+  });
+  setcollaboratorProfiles(cachedList);
+
+  // 2) batch fetch fresh profiles from Firestore
+  (async () => {
+    try {
+      const uids = Array.from(new Set(collaboratorUIDs));
+      const chunks = chunkArray(uids, 10); // Firestore 'in' limit = 10
+      const fetches = chunks.map(async (chunk) => {
+        const q = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      });
+      const arrays = await Promise.all(fetches);
+      const flat = arrays.flat();
+      const map = new Map(flat.map(p => [p.uid, { displayName: p.displayName || 'Unknown', photoURL: p.photoURL || '' }]));
+      const ordered = uids.map(uid => {
+        const got = map.get(uid);
+        const out = got || { displayName: 'Unknown', photoURL: '' };
+        // update cache
+        try {
+          const key = `profile_${uid}`;
+          const toStore = { _cachedAt: Date.now(), data: { displayName: out.displayName, photoURL: out.photoURL } };
+          localStorage.setItem(key, JSON.stringify(toStore));
+        } catch (e) { /* ignore localStorage errors */ }
+        return { uid, ...out };
+      });
+
+      if (!cancelled) setcollaboratorProfiles(ordered);
+    } catch (err) {
+      console.error('Failed to fetch profiles in batch:', err);
+    }
+  })();
+
+  return () => { cancelled = true; };
+}, [collaboratorUIDs]);
 
   // escape key handler to exit reorder mode
   useEffect(() => {
@@ -199,64 +311,6 @@ const [dragActive, setDragActive] = useState(false);
   return () => window.removeEventListener('keydown', onKey);
 }, [reorderMode]);
 
-  // realtime collaborators list
-  useEffect(() => {
-    if (!boardId) return;
-    const collaboratorsRef = collection(db, 'boards', boardId, 'collaborators');
-    const unsubscribe = onSnapshot(collaboratorsRef, (snapshot) => {
-      setCollaborators(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsubscribe();
-  }, [boardId]);
-
-  // -------------------- profile caching + fetching --------------------
-  useEffect(() => {
-    async function fetchCollaboratorProfiles() {
-      if (!collaboratorUIDs || collaboratorUIDs.length === 0) return;
-
-      try {
-        const TTL = 1000 * 60 * 60 * 24; // 24 hours
-        const now = Date.now();
-
-        const results = await Promise.all(
-          collaboratorUIDs.map(async (uid) => {
-            try {
-              const cachedRaw = localStorage.getItem(`profile_${uid}`);
-              if (cachedRaw) {
-                const cached = JSON.parse(cachedRaw);
-                if (cached._cachedAt && now - cached._cachedAt < TTL) {
-                  console.log(`Profile for ${uid} loaded from cache`);
-                  return { uid, ...cached.data };
-                }
-              }
-
-              console.log(`Profile for ${uid} fetched from Firestore`);
-
-              const userSnap = await getDoc(doc(db, 'users', uid));
-              const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', photoURL: '' };
-
-              const toStore = { displayName: userData.displayName || 'Unknown', photoURL: userData.photoURL || '' };
-              localStorage.setItem(
-                `profile_${uid}`,
-                JSON.stringify({ _cachedAt: now, data: toStore })
-              );
-
-              return { uid, ...toStore };
-            } catch (err) {
-              console.error('error fetching profile for', uid, err);
-              return { uid, displayName: 'Unknown', photoURL: '' };
-            }
-          })
-        );
-
-        setcollaboratorProfiles(results);
-      } catch (error) {
-        console.error('Error fetching collaborator profiles:', error);
-      }
-    }
-
-    fetchCollaboratorProfiles();
-  }, [collaboratorUIDs]);
 
   // -------------------- realtime images subscription --------------------
   useEffect(() => {
