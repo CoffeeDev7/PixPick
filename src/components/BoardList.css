@@ -1,0 +1,90 @@
+/* smooth theme transitions */
+.search-row,
+.search-input,
+.view-popover,
+.segmented-pill,
+.seg-btn {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* default / light (you already have similar rules; these are safe overrides) */
+.search-input {
+  background: #fff;
+  border: 1px solid #e6e6ea;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+  color: #222;
+}
+
+/* input & placeholder */
+.search-input input {
+  background: transparent;
+  color: inherit;
+}
+.search-input input::placeholder {
+  color: #9aa0a6;
+  opacity: 1;
+}
+
+/* clear button inside search */
+.clear-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #666;
+  padding: 0 6px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* view popover default */
+.view-popover { background: #fff; color: #222; }
+
+/* segmented pill defaults */
+.segmented-pill { background: #ffffff; border: 1px solid rgba(16,16,20,0.08); box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset; }
+.seg-btn { color: #5b5b66; background: transparent; }
+.seg-btn.active { background: #1b999f; color: #fff; }
+
+/* ------------------ DARK MODE ------------------ */
+@media (prefers-color-scheme: dark) {
+  /* overall component text */
+  .boardlist-root { color: #e6e6e6; }
+
+  /* search input */
+  .search-input {
+    background: #111315;               /* dark card */
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: none;
+    color: #e6e6e6;
+  }
+  .search-input input { color: #e6e6e6; }
+  .search-input input::placeholder { color: #9a9a9a; opacity: 0.9; }
+
+  /* icons + clear button */
+  .search-input svg { color: rgba(255,255,255,0.75); opacity: 0.9; }
+  .clear-btn { color: rgba(255,255,255,0.75); }
+
+  /* view popover (dropdown) */
+  .view-popover {
+    background: #0f1112;
+    border: 1px solid rgba(255,255,255,0.06);
+    color: #e6e6e6;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+  }
+
+  /* segmented pill + buttons */
+  .segmented-pill {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    box-shadow: none;
+  }
+  .seg-btn {
+    color: #cfcfd6;
+    background: transparent;
+  }
+  .seg-btn:hover { background: rgba(255,255,255,0.02); }
+  .seg-btn.active {
+    background: #1b999f; /* keep your accent — it's readable on dark */
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.6);
+  }
+}

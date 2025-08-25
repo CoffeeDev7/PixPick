@@ -16,6 +16,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FiTrash2 } from "react-icons/fi";
 import { MdEdit } from "react-icons/md";
 import { MdViewModule, MdViewDay, MdTextFields, MdSearch, MdMoreVert } from "react-icons/md";
+import './BoardList.css'
 
 export default function BoardList({ user, selected }) {
   const [boards, setBoards] = useState([]);
@@ -306,9 +307,9 @@ export default function BoardList({ user, selected }) {
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
+      {/* DO NOT style `body` here — scope to the component root  */}
       <style>{`
         :root { --max-width: 640px; --gap: 14px; --card-radius: 12px; }
-        body { background: #f7f7f8; }
         .container { width: 100%; max-width: var(--max-width); }
         .board-grid { display: grid; gap: var(--gap); }
         .board-item { background: white; border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 6px 18px rgba(12,12,16,0.05); cursor: pointer; position: relative; }
@@ -370,10 +371,11 @@ export default function BoardList({ user, selected }) {
               aria-label="Search boards"
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm("")} style={{ border: "none", background: "transparent", cursor: "pointer" }} aria-label="Clear search">
+              <button onClick={() => setSearchTerm("")} className="clear-btn" aria-label="Clear search">
                 ×
               </button>
             )}
+
           </div>
 
           {/* view popover toggle */}
