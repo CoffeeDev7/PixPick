@@ -910,29 +910,6 @@ const handleDragLeave = (event) => {
     }
   };
 
-  // -------------------- long-press handlers --------------------
-  // LONG_PRESS_MS can stay the same (400) or bump to 500/600 if you want a longer hold
-const startLongPress = (index) => {
-  // make sure any prior timer is cleared
-  if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-
-  longPressTimerRef.current = setTimeout(() => {
-    // Enter reorder mode and set the active "dragging" item so user can move it
-    setReorderMode(true);
-    setDraggingIndex(index);
-
-    // small UX hint
-    showToast('Reorder mode enabled — use drag (desktop) or move buttons (mobile). Press Escape to finish.', 'info', 2500);
-  }, LONG_PRESS_MS);
-};
-
-const cancelLongPress = () => {
-  if (longPressTimerRef.current) {
-    clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  }
-};
-
 
   // delete single image
   const handleDeleteImage = async (imageId, index) => {
@@ -1140,9 +1117,29 @@ const cancelLongPress = () => {
 
       {/* Collaborators */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }}>
-        {collaboratorProfiles.map((profile, i) => (
-          <img key={profile.uid} src={profile.photoURL} alt={profile.displayName} title={`${profile.displayName} (${profile.uid})`} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', objectFit: 'cover', transform: `translateX(-${i * 10}px)`, zIndex: collaboratorProfiles.length - i }} />
-        ))}
+        {collaboratorProfiles.map((profile, i) => {
+        const photo = profile.photoURL || "/public/eat (1).png"; // fallback image
+        const name = profile.displayName || "Unknown User";
+
+        return (
+          <img
+            key={profile.uid}
+            src={photo}
+            alt={name}
+            title={`${name} (${profile.uid})`}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '2px solid white',
+              objectFit: 'cover',
+              transform: `translateX(-${i * 10}px)`,
+              zIndex: collaboratorProfiles.length - i,
+        }}
+    />
+  );
+})}
+
       </div>
 
       {/* Paste box */}
@@ -1169,8 +1166,6 @@ const cancelLongPress = () => {
   }}
 />
 
-
-
       {/* Images grid */}
       <ImageGrid
         images={images}
@@ -1179,8 +1174,6 @@ const cancelLongPress = () => {
         setReorderMode={setReorderMode}
         draggingIndex={draggingIndex}
         dragOverIndex={dragOverIndex}
-        startLongPress={startLongPress}
-        cancelLongPress={cancelLongPress}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDrop={onDrop}

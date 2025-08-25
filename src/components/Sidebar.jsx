@@ -108,10 +108,10 @@ export default function Sidebar({
         <div style={{ marginLeft: 'auto', fontSize: 13, color: '#8b98a1' }}>Recent</div>
       </div>
 
-      <div style={{ marginTop: 22, fontSize: 13, color: '#73808a' }}>
-        <div style={{ marginBottom: 8 }}>Workspace</div>
-        <div style={{ fontSize: 12, color: '#97a3aa' }}>Manage boards, shares and notifications here.</div>
-      </div>
+      {/* <div style={{ marginTop: 22, fontSize: 13, color: '#73808a' }}>
+        <div style={{ marginBottom: 8 }}>🎨 PixPick</div>
+        <div style={{ fontSize: 12, color: '#97a3aa' }}>Share, and vibe with your boards in real-time.</div>
+      </div> */}
     </div>
   );
 }
