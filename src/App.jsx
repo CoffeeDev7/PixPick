@@ -7,7 +7,7 @@ import BoardPage from './components/BoardPage';
 import NotificationsPage from './components/Notifications';
 import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { useEffect, useState, useRef } from 'react';
+import { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -187,6 +187,17 @@ export default function App() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  // Lazy load BoardPage with timing log
+  const BoardPage = lazy(async () => {
+    const start = performance.now();
+    const module = await import("./components/BoardPage");
+    const end = performance.now();
+    console.log(
+      `[LazyLoad] BoardPage chunk loaded in ${(end - start).toFixed(2)}ms`
+    );
+    return module;
+  });
+
   return (
     <div className="fade-in" style={{ margin: 0, padding: 0, boxSizing: 'border-box' }}>
       {/* TOP Deep Teal HEADER */}
@@ -337,7 +348,12 @@ export default function App() {
               <BoardList user={user} selected={selected} />
             </>
           } />
-          <Route path="/board/:id" element={<BoardPage user={user} />} />
+          <Route
+            path="/board/:id" element={
+              <Suspense fallback={<div>Loading board...</div>}>
+                <BoardPage user={user} />
+              </Suspense> }
+          />
           <Route path="/notifications" element={<NotificationsPage user={user} />} />
         </Routes>
       </div>

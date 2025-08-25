@@ -311,6 +311,20 @@ useEffect(() => {
   return () => window.removeEventListener('keydown', onKey);
 }, [reorderMode]);
 
+// lazy logs
+useEffect(() => {
+    const mountTime = performance.now();
+    console.log("[BoardPage] mounted at", new Date().toLocaleTimeString());
+
+    return () => {
+      const unmountTime = performance.now();
+      console.log(
+        `[BoardPage] unmounted, stayed for ${(unmountTime - mountTime).toFixed(
+          2
+        )}ms`
+      );
+    };
+  }, []);
 
   // -------------------- realtime images subscription --------------------
   useEffect(() => {
