@@ -17,6 +17,7 @@ import { FiTrash2 } from "react-icons/fi";
 import { MdEdit } from "react-icons/md";
 import { MdViewModule, MdViewDay, MdTextFields, MdSearch, MdMoreVert } from "react-icons/md";
 import './BoardList.css'
+import { useMediaQuery } from "@mui/material"; // or write your own hook
 
 export default function BoardList({ user, selected }) {
   const [boards, setBoards] = useState([]);
@@ -29,6 +30,9 @@ export default function BoardList({ user, selected }) {
   const location = useLocation();
   const menuRef = useRef();
   const imagesUnsubsRef = useRef(new Map());
+
+  // inside your component
+const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as needed
 
   // search + view popover state
   const [searchTerm, setSearchTerm] = useState("");
@@ -358,14 +362,19 @@ export default function BoardList({ user, selected }) {
               <div className="view-popover" role="dialog" aria-label="View options">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div className="segmented-pill" role="tablist" aria-label="View mode">
-                    <button
-                      className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
-                      onClick={() => { setViewMode("wide"); setViewPopoverOpen(false); }}
-                      title="Wide view"
-                      aria-pressed={viewMode === "wide"}
-                    >
-                      <MdViewModule size={18} />
-                    </button>
+                    {isMobile && (
+                      <button
+                        className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
+                        onClick={() => {
+                          setViewMode("wide");
+                          setViewPopoverOpen(false);
+                        }}
+                        title="Wide view"
+                        aria-pressed={viewMode === "wide"}
+                      >
+                        <MdViewModule size={18} />
+                      </button>
+                    )}
 
                     <button
                       className={`seg-btn ${viewMode === "compact" ? "active" : ""}`}
@@ -387,7 +396,7 @@ export default function BoardList({ user, selected }) {
                   </div>
 
                   <div className="seg-labels" aria-hidden="true" style={{ marginLeft: 8 }}>
-                    <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>
+                    {isMobile && <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>}
                     <div style={{ opacity: viewMode === "compact" ? 1 : 0.5 }}>Compact</div>
                     <div style={{ opacity: viewMode === "plain" ? 1 : 0.5 }}>Plain</div>
                   </div>

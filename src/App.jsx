@@ -337,7 +337,8 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ padding: '0.6rem', marginTop: isBoardPage ? '0px' : 'calc(60px + 12px)', transition: 'margin-top 0.3s ease' }}>
+      <div style={{ padding: isBoardPage? '0rem': '0.8rem', marginTop: isBoardPage ? '0px' : 'calc(60px + 12px)', transition: 'margin-top 0.3s ease' ,
+        background:'linear-gradient(90deg,rgba(162, 161, 166, 1) 0%, rgba(201, 211, 212, 1) 55%, rgba(145, 162, 163, 1) 100%)'}}>
         <Routes>
           <Route path="/" element={
             <>

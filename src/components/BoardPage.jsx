@@ -1118,7 +1118,7 @@ const handleDragLeave = (event) => {
   }, [showBoardMenu]);
 
   return (
-    <div style={{ marginTop: '0px' }}>
+    <div style={{ marginTop: '0px' }} className='boardpage'>
       {/* boardpage HEADER kinda */}
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
         <button onClick={handleBack} aria-label="Back" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 1, marginRight: 8, display: 'inline-flex', alignItems: 'center', outline: 'none' }}>
@@ -1199,7 +1199,6 @@ const handleDragLeave = (event) => {
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              border: '2px solid white',
               objectFit: 'cover',
               transform: `translateX(-${i * 10}px)`,
               zIndex: collaboratorProfiles.length - i,
