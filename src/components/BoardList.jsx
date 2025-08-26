@@ -320,7 +320,7 @@ const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as ne
         </div>
 
         {/* Search + view button row */}
-        <div className="search-row">
+        {false && <div className="search-row">
           <div className="search-input" role="search" aria-label="Search boards">
             <MdSearch size={18} style={{ opacity: 0.6 }} />
             <input
@@ -404,7 +404,7 @@ const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as ne
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
 
       {filteredBoards.length === 0 && <p>No boards to show</p>}

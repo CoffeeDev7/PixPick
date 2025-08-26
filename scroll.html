@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Scroll Restore Demo · Boards</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --header-h: 64px;
+      --bg1: #0ea5a5;
+      --bg2: #f1f5f9;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--ink);
+      background: var(--bg2);
+    }
+    /* fixed header to test offset behavior */
+    .header {
+      position: fixed; inset: 0 0 auto 0; height: var(--header-h);
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 16px; background: var(--bg1); color: white;
+      z-index: 10; box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    }
+    .header a { color: white; text-decoration: none; font-weight: 600; }
+    .header .spacer { flex: 1; }
+    .wrap {
+      padding: 16px;
+      margin-top: var(--header-h);
+      transition: margin-top .2s;
+    }
+    .hero {
+      background: linear-gradient(90deg, #a7f3d0, #bae6fd);
+      border-radius: 16px; padding: 24px; margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--card); border-radius: 14px; padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .card h3 { margin: 0 0 8px 0; font-size: 16px; }
+    .card p  { margin: 0; color: var(--muted); font-size: 13px; }
+    .board-link {
+      display: block; text-decoration: none; color: inherit;
+    }
+    .chiprow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      font-size: 12px; padding: 4px 8px; border-radius: 999px;
+      background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155;
+    }
+    .section {
+      margin: 24px 0;
+    }
+    .tall-block {
+      height: 520px;
+      border-radius: 14px;
+      background: repeating-linear-gradient(
+        45deg,
+        #eef2ff, #eef2ff 14px,
+        #e0e7ff 14px, #e0e7ff 28px
+      );
+      display: grid; place-items: center;
+      color: #3730a3; font-weight: 700;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    }
+
+    /* Detail page */
+    .detail {
+      max-width: 980px; margin: 0 auto;
+    }
+    .detail h1 { margin: 0 0 12px 0; }
+    .ph-img {
+      width: 100%; height: 280px; border-radius: 12px; object-fit: cover; display: block;
+      background: #e2e8f0;
+    }
+    .para {
+      line-height: 1.7; color: #334155; margin: 12px 0;
+    }
+    .back {
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; background: white; padding: 8px 12px; border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08); border: 1px solid #e2e8f0; color: #0f172a;
+    }
+    .muted {
+      color: #64748b; font-size: 13px;
+    }
+    .rule { height: 1px; background: #e2e8f0; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="/" data-internal>PixPick</a>
+    <div class="spacer"></div>
+    <a href="/" data-internal>Boards</a>
+  </div>
+
+  <main id="app" class="wrap">
+    <!-- Content injected by tiny router -->
+  </main>
+
+  <script>
+    // ===== Forceful Global Scroll Restore (vanilla) =====
+    (function() {
+      const HEADER_OFFSET = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 64;
+      const SELECTORS = ["#app", ".wrap", ".grid", ".detail"]; // common containers; window is primary
+
+      const keyFor = (path, search) => `pixpick:scroll:${path}${search||""}`;
+
+      const readSnapshot = (k) => {
+        const raw = sessionStorage.getItem(k);
+        if (!raw) return null;
+        try { return JSON.parse(raw); } catch { return null; }
+      };
+
+      const collectSnapshot = () => {
+        const snap = { window: window.scrollY || 0, ts: Date.now() };
+        for (const sel of SELECTORS) {
+          const el = document.querySelector(sel);
+          snap[sel] = el ? (el.scrollTop || 0) : 0;
+        }
+        return snap;
+      };
+
+      const forceWrite = (snap) => {
+        try { window.scrollTo(0, Math.max(0, (snap.window||0) - HEADER_OFFSET)); } catch {}
+        for (const sel of SELECTORS) {
+          const el = document.querySelector(sel);
+          if (!el) continue;
+          const v = Math.max(0, (snap[sel] || 0) - HEADER_OFFSET);
+          el.scrollTop = v;
+        }
+      };
+
+      const saveNow = () => {
+        const { pathname, search } = window.location;
+        const k = keyFor(pathname, search);
+        const snap = collectSnapshot();
+        sessionStorage.setItem(k, JSON.stringify(snap));
+        // console
+        console.log("[pixpick] saved", k, snap);
+      };
+
+      const aggressiveRestore = (timeoutMs = 1500) => {
+        const { pathname, search } = window.location;
+        const k = keyFor(pathname, search);
+        const snap = readSnapshot(k);
+        if (!snap) {
+          console.log("[pixpick] no snapshot to restore for", k);
+          return;
+        }
+        console.log("[pixpick] aggressive restore start for", k, snap);
+
+        // One immediate write
+        forceWrite(snap);
+
+        // Re-apply for a short window (handles late images/layout shifts)
+        const start = Date.now();
+        const int = setInterval(() => {
+          forceWrite(snap);
+          if (Date.now() - start > timeoutMs) {
+            clearInterval(int);
+            console.log("[pixpick] aggressive restore finished for", k);
+          }
+        }, 120);
+
+        // Also apply on initial next paint
+        requestAnimationFrame(() => forceWrite(snap));
+      };
+
+      // manual mode (so browser doesn't fight us)
+      try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch {}
+
+      // Save often while user scrolls (rAF throttle)
+      let raf = 0;
+      window.addEventListener('scroll', () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => { raf = 0; saveNow(); });
+      }, { passive: true, capture: true });
+
+      // Save on interactions & before unload
+      ['mousedown','touchstart','keydown'].forEach(evt =>
+        window.addEventListener(evt, saveNow, { capture: true })
+      );
+      window.addEventListener('beforeunload', saveNow);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') saveNow();
+      });
+
+      // Restore on back/forward
+      window.addEventListener('popstate', () => {
+        console.log("[pixpick] popstate -> trying restore");
+        // Content will re-render via router; give it a tick then restore
+        setTimeout(() => aggressiveRestore(), 30);
+      });
+
+      // Expose to router to call after render
+      window.__restoreScrollAggressively = () => aggressiveRestore();
+      window.__saveScrollNow = () => saveNow();
+    })();
+
+    // ===== Tiny Client-side Router (intercepts <a data-internal>) =====
+    const app = document.getElementById('app');
+
+    function lorem(n=1) {
+      const t = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent eget dapibus neque. Integer tempus, sapien non ultrices tincidunt, urna nunc interdum neque, quis vehicula felis lectus eget risus.";
+      return Array.from({length:n}).map(()=>t).join(" ");
+    }
+
+    // Home (boards list) — lots of vertical content
+    function renderHome() {
+      const blocks = Array.from({ length: 8 }, (_, i) => `
+        <section class="section">
+          <div class="hero">
+            <h2>Featured Section ${i+1}</h2>
+            <p class="muted">${lorem(2)}</p>
+          </div>
+          <div class="grid">
+            ${Array.from({ length: 12 }, (_, j) => {
+              const id = `b${i+1}-${j+1}-${Math.random().toString(36).slice(2,7)}`;
+              const qs = `?view=grid&sort=recent&n=${i}-${j}`;
+              return `
+                <a class="board-link" href="/board/${id}${qs}" data-internal>
+                  <article class="card">
+                    <h3>Board ${i+1}.${j+1}</h3>
+                    <p>${lorem()}</p>
+                    <div class="chiprow">
+                      <span class="chip">grid</span>
+                      <span class="chip">recent</span>
+                      <span class="chip">${id.slice(0,6)}</span>
+                    </div>
+                  </article>
+                </a>
+              `;
+            }).join("")}
+          </div>
+        </section>
+        <div class="tall-block">Tall filler ${i+1}</div>
+      `).join("");
+
+      app.innerHTML = `
+        <div class="section">
+          <h1>Boards</h1>
+          <p class="muted">Scroll down, click any board, then press browser Back — your position should be restored.</p>
+        </div>
+        ${blocks}
+      `;
+    }
+
+    // Board detail
+    function renderBoard(id, params) {
+      const title = `Board ${id}`;
+      app.innerHTML = `
+        <div class="detail">
+          <a class="back" href="/" data-internal>&larr; Back to Boards</a>
+          <div class="rule"></div>
+          <h1>${title}</h1>
+          <p class="muted">Params: ${new URLSearchParams(params).toString() || "(none)"}</p>
+          <img class="ph-img" alt="" src="https://picsum.photos/seed/${encodeURIComponent(id)}/1600/900" />
+          ${Array.from({length: 30}, (_, i) => `<p class="para"><strong>Paragraph ${i+1}.</strong> ${lorem(2)}</p>`).join("")}
+        </div>
+      `;
+    }
+
+    function routeTo(pathname, search) {
+      // simple matcher: /  or  /board/:id
+      if (pathname === "/") {
+        renderHome();
+      } else {
+        const m = pathname.match(/^\/board\/([^/]+)$/);
+        if (m) {
+          renderBoard(m[1], search);
+        } else {
+          app.innerHTML = `<h1>Not found</h1><p><a href="/" data-internal>Go Home</a></p>`;
+        }
+      }
+      // after painting content, attempt scroll restore
+      requestAnimationFrame(() => {
+        if (window.__restoreScrollAggressively) window.__restoreScrollAggressively();
+      });
+    }
+
+    // initial render
+    routeTo(location.pathname, location.search);
+
+    // intercept internal links
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest && e.target.closest('a[data-internal]');
+      if (!a) return;
+      const url = new URL(a.href);
+      if (url.origin !== location.origin) return;
+      e.preventDefault();
+
+      // Save where we are (home scroll) before navigating
+      if (window.__saveScrollNow) window.__saveScrollNow();
+
+      history.pushState({}, "", url.pathname + url.search);
+      routeTo(url.pathname, url.search);
+    });
+
+    // on hard refresh in Live Server, keep SPA alive; popstate is handled above
+    window.addEventListener('popstate', () => {
+      routeTo(location.pathname, location.search);
+    });
+  </script>
+</body>
+</html>

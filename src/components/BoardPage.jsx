@@ -1209,28 +1209,51 @@ const handleDragLeave = (event) => {
       </div>
 
       {/* Paste box */}
+      <style>{`
+    @keyframes pulseBorder {
+      0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6); }
+      50% { box-shadow: 0 0 10px 4px rgba(33, 150, 243, 0.9); }
+      100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.3); }
+    }
+  `}</style>
       <textarea
-  ref={pasteRef}
-  placeholder="Paste or Drag images/links here"
-  onPaste={handlePaste}
-  onDrop={handleDrop}
-  onDragOver={handleDragOver}
-  onDragLeave={handleDragLeave}
-  rows={4}   // bigger
-  style={{
-    display: 'block',
-    width: '100%',
-    height: '70px', // bigger box
-    border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
-    background: dragActive ? '#e3f2fd' : '#eaffea',
-    fontSize: '16px',
-    marginBottom: '16px',
-    padding: '10px',
-    borderRadius: '8px',
-    boxSizing: 'border-box',
-    transition: 'all 0.2s ease'
-  }}
-/>
+        ref={pasteRef}
+        className='my-textarea-input'
+        placeholder="Paste or Drag images/links here..."
+        onPaste={handlePaste}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        rows={4}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '40px',          // default height
+          maxHeight: '200px',      // maximum expanded height
+          border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
+          background: dragActive ? '#e3f2fd' : 'linear-gradient(90deg,rgba(167, 201, 115, 1) 0%, rgba(6, 103, 112, 1) 55%, rgba(129, 227, 102, 1) 100%)',
+          fontSize: '16px',
+          marginBottom: '16px',
+          padding: '10px',
+          borderRadius: '10px',
+          boxSizing: 'border-box',
+          transition: 'height 0.3s ease, box-shadow 0.3s ease', // smooth height change
+          outline: 'none',
+          overflow: 'hidden',
+          resize: 'none',           // prevent manual resizing for clean UX
+          animation: dragActive ? 'pulseBorder 0.7s infinite' : 'none',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.height = '45px';    // expanded height
+          e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.height = '40px';     // default height
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+      />
+
+
 
       {/* Images grid */}
       <ImageGrid
@@ -1264,7 +1287,10 @@ const handleDragLeave = (event) => {
           {/* Trash icon */}
           <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', bottom: '8%', left: isMobile? '60%':'55%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center' }}>
             <button aria-label="Delete" onClick={() => handleDeleteImage(images[modalIndex]?.id, modalIndex)} style={{ background: 'rgba(0,0,0,0.6)', border: 'none', padding: '8px 12px', color: '#fff', borderRadius: 999, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M19 6l-1 14H6L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /> <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+
             </button>
           </div>
         </div>
