@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import './BoardPage.css'; // Assuming you have a CSS file for styles
 import ImageGrid from './ImageGrid'; // Import the ImageGrid component
-
+import { ArrowLeft } from 'lucide-react';
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
@@ -1033,6 +1033,7 @@ const handleDragLeave = (event) => {
       }
     }
   };
+  
 
   const handleDeleteBoard = async (boardIdParam) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this board?');
@@ -1101,12 +1102,20 @@ const handleDragLeave = (event) => {
 
   return (
     <div style={{ marginTop: '0px' }} className='boardpage'>
-      {/* boardpage HEADER kinda */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
-        <button onClick={handleBack} aria-label="Back" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 1, marginRight: 8, display: 'inline-flex', alignItems: 'center', outline: 'none' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+      {/* back button  */}
+        <button className="fixed-back-btn" onClick={() => navigate(-1)} aria-label="Go back" title="Back">
+        {/* simple left chevron SVG */}
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <path d="M15 6 L9 12 L15 18" />
+        </svg>
         </button>
 
+      {/* boardpage HEADER kinda */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
+        
+        {/* LEFT spacer: reserve same visual width as the floating button (56) + left offset (12) =>
+          total 68 so the right side remains exactly to the right like before */}
+        <div style={{ width: 68, height: 1 }} />
         {/* board comments button (restored) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* reorder toggle */}

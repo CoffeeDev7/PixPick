@@ -178,3 +178,55 @@
   opacity: 0;
   background: linear-gradient(90deg,rgba(167, 201, 115, 1) 0%, rgba(6, 103, 112, 1) 55%, rgba(129, 227, 102, 1) 100%);
 }
+
+/* Floating back button (drop into your main CSS file) */
+/* put this in your global CSS file (e.g., App.css) */
+.fixed-back-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px); /* respects notches */
+  left: 12px;
+  z-index: 99999;
+
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 14px;            /* rounded rectangle like screenshot */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(255,255,255,0.68); /* light translucent */
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 6px 18px rgba(8,10,14,0.10);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+
+  cursor: pointer;
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+}
+
+/* subtle lift on hover */
+.fixed-back-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.82);
+  box-shadow: 0 10px 22px rgba(8,10,14,0.12);
+}
+
+.fixed-back-btn:active { transform: translateY(0); }
+
+.fixed-back-btn:focus {
+  outline: 3px solid rgba(34,126,255,0.14);
+  outline-offset: 2px;
+}
+
+/* arrow stroke */
+.fixed-back-btn svg {
+  width: 22px;
+  height: 22px;
+  stroke: #0b0b0b;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0.92;
+}

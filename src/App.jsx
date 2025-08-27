@@ -18,6 +18,8 @@ import confetti from "canvas-confetti";
 export default function App() {
   const [user, setUser] = useState(null);
   const [selected, setSelected] = useState('My Boards');
+  const [boardsCache, setBoardsCache] = useState([]);
+
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -346,7 +348,7 @@ export default function App() {
                 <h2 style={{ margin: 0, marginLeft: '12px' }}>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
               </div>
-              <BoardList user={user} selected={selected} />
+              <BoardList user={user} selected={selected} boardsCache={boardsCache} setBoardsCache={setBoardsCache}/>
             </>
           } />
           <Route

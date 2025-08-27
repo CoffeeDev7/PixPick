@@ -1,135 +1,49 @@
-// BoardList.jsx
-import { useEffect, useState, useRef } from "react";
-import {
-  collection,
-  query,
-  orderBy,
-  limit,
-  getDocs,
-  onSnapshot,
-  doc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase";
-import { useNavigate, useLocation } from "react-router-dom";
-import { FiTrash2 } from "react-icons/fi";
-import { MdEdit } from "react-icons/md";
-import { MdViewModule, MdViewDay, MdTextFields, MdSearch, MdMoreVert } from "react-icons/md";
-import './BoardList.css'
-import { useMediaQuery } from "@mui/material"; // or write your own hook
 
-export default function BoardList({ user, selected }) {
+export default function BoardList({ user, boardsCache, setBoardsCache, selected }) {
   const [boards, setBoards] = useState([]);
-  const [menuOpenFor, setMenuOpenFor] = useState(null);
-  const [latestboardimages, setlatestboardimages] = useState({});
-  const [cachedLatestImages, setCachedLatestImages] = useState({}); // resolved (and optionally cached) urls
-  const [viewMode, setViewMode] = useState("wide"); // "wide" | "compact" | "plain"
-  const [imagesLoading, setImagesLoading] = useState(true);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const menuRef = useRef();
-  const imagesUnsubsRef = useRef(new Map());
+  const [latestboardimages, setLatestBoardImages] = useState({});
+  const [viewMode, setViewMode] = useState("wide");
 
-  // inside your component
-const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as needed
-
-  // search + view popover state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [viewPopoverOpen, setViewPopoverOpen] = useState(false);
-  const viewPopoverRef = useRef();
-
-  // --- persist viewMode to localStorage so it survives navigation
+  // ---------- existing listeners (unchanged) ----------
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("pixpick_view_mode");
-      if (saved) setViewMode(saved);
-    } catch (err) {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("pixpick_view_mode", viewMode);
-    } catch (err) {
-      // ignore
-    }
-  }, [viewMode]);
-
-  // --- image cache (in-memory map on window so it survives remounts within SPA)
-  // value: Map<src -> { loaded: true }>
-  if (!window.__pixpickImageCache) window.__pixpickImageCache = new Map();
-
-  // resolve a src to a cached marker (we keep the src but log/load)
-  // returns a Promise that resolves to src (or data/objectURL if you wanted to transform)
-  const resolveCachedSrc = (src) => {
-    return new Promise((resolve) => {
-      if (!src) return resolve(src);
-
-      const cache = window.__pixpickImageCache;
-      if (cache.has(src)) {
-        // Already cached in memory
-        console.log("[pixpick] loaded image from in-memory cache:");
-        return resolve(src);
-      }
-
-      // create an Image to warm browser cache and detect load
-      const img = new Image();
-      img.onload = () => {
-        try {
-          cache.set(src, { loaded: true, ts: Date.now() });
-        } catch (err) {
-          // ignore storage errors
-        }
-        console.log("[pixpick] image cached after load:");
-        resolve(src);
-      };
-      img.onerror = () => {
-        // still resolve to original src so UI can attempt to load it (broken images will show as usual)
-        console.warn("[pixpick] image failed to load (will still use src):", src);
-        resolve(src);
-      };
-
-      // finally assign src to start loading
-      img.src = src;
-      // if the image is already in browser http cache the onload might not fire synchronously -> still fine
+    if (!user || boardsCache.length > 0) return;
+    const unsub = onSnapshot(collection(db, "boards"), (snap) => {
+      const temp = [];
+      snap.forEach((doc) => {
+        const data = { id: doc.id, ...doc.data() };
+        if (data.ownerId === user.uid) temp.push(data);
+      });
+      setBoardsCache(temp);
     });
-  };
+    return () => unsub();
+  }, [user, boardsCache, setBoardsCache]);
 
-  // When latestboardimages changes, resolve each src via cache helper and store in cachedLatestImages
   useEffect(() => {
-    let active = true;
-    const allBoardIds = Object.keys(latestboardimages || {});
-    if (allBoardIds.length === 0) {
-      setCachedLatestImages({});
-      return;
-    }
+    if (boardsCache.length > 0) setBoards(boardsCache);
+  }, [boardsCache]);
 
-    (async () => {
-      const result = {};
-      for (const boardId of allBoardIds) {
-        const arr = latestboardimages[boardId] || [];
-        // resolve each src in order (fire off resolves in parallel)
-        const promises = arr.map((s) => resolveCachedSrc(s));
-        try {
-          const resolved = await Promise.all(promises);
-          if (!active) return;
-          result[boardId] = resolved;
-        } catch (err) {
-          console.error("Error resolving cached images:", err);
-          result[boardId] = arr;
-        }
-      }
-      if (active) setCachedLatestImages((prev) => ({ ...prev, ...result }));
-    })();
+  useEffect(() => {
+    if (!user) return;
+    const unsubs = [];
+    boards.forEach((board) => {
+      const qImg = query(
+        collection(db, "boards", board.id, "images"),
+        orderBy("createdAt", "desc"),
+        limit(3)
+      );
+      const unsub = onSnapshot(qImg, (snap) => {
+        const imgs = snap.docs.map((d) => d.data().src || "");
+        setLatestBoardImages((prev) => ({ ...prev, [board.id]: imgs }));
+      });
+      unsubs.push(unsub);
+    });
+    return () => unsubs.forEach((u) => u());
+  }, [user, boards]);
 
-    return () => {
-      active = false;
-    };
-  }, [latestboardimages]);
-
-  // Fetch boards list (unchanged logic, but kept careful)
   useEffect(() => {
     if (!user) return;
     let boardUnsub = null;
@@ -138,10 +52,8 @@ const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as ne
     const startListening = () => {
       boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
         const tempBoards = [];
-
         boardsSnap.forEach((boardDoc) => {
           const boardData = { id: boardDoc.id, ...boardDoc.data() };
-
           if (selected === "My Boards") {
             if (boardData.ownerId === user.uid) tempBoards.push(boardData);
           } else if (selected === "Shared with Me") {
@@ -199,304 +111,184 @@ const isMobile = useMediaQuery("(max-width: 768px)"); // adjust breakpoint as ne
     };
 
     startListening();
-
     return () => {
       if (boardUnsub) boardUnsub();
       collabUnsubs.forEach((unsub) => unsub());
     };
   }, [user, selected]);
 
-  // Fetch latest 3 images for each board
-  useEffect(() => {
-    if (!user) return;
-    setImagesLoading(true);
-
-    const visibleBoardIds = boards.map((b) => b.id);
-
-    visibleBoardIds.forEach((boardId) => {
-      if (imagesUnsubsRef.current.has(boardId)) return;
-
-      const imagesRef = collection(db, "boards", boardId, "images");
-      const q = query(imagesRef, orderBy("createdAt", "desc"), limit(3));
-
-      const unsub = onSnapshot(
-        q,
-        (snap) => {
-          const latestImages = snap.docs.map((d) => d.data().src || "");
-          setlatestboardimages((prev) => {
-            const old = prev[boardId] || [];
-            const same =
-              old.length === latestImages.length &&
-              old.every((v, i) => v === latestImages[i]);
-            if (same) return prev;
-            return { ...prev, [boardId]: latestImages };
-          });
-          setImagesLoading(false);
-        },
-        (err) => {
-          console.error("images listener error for", boardId, err);
-        }
-      );
-
-      imagesUnsubsRef.current.set(boardId, unsub);
-    });
-
-    // remove listeners for boards not visible
-    imagesUnsubsRef.current.forEach((unsub, id) => {
-      if (!visibleBoardIds.includes(id)) {
-        unsub();
-        imagesUnsubsRef.current.delete(id);
-        setlatestboardimages((prev) => {
-          if (!prev[id]) return prev;
-          const copy = { ...prev };
-          delete copy[id];
-          return copy;
-        });
-        setCachedLatestImages((prev) => {
-          if (!prev[id]) return prev;
-          const copy = { ...prev };
-          delete copy[id];
-          return copy;
-        });
-      }
-    });
-
-    return () => {
-      imagesUnsubsRef.current.forEach((unsub) => unsub());
-      imagesUnsubsRef.current.clear();
-    };
-  }, [user, selected, boards]);
-
-  const handleRename = (boardId, currentTitle) => {
-    const newTitle = prompt("Enter new title", currentTitle);
-    if (newTitle && newTitle.trim() !== "") {
-      const boardRef = doc(db, "boards", boardId);
-      const capitalizedTitle = newTitle.trim().charAt(0).toUpperCase() + newTitle.trim().slice(1);
-      updateDoc(boardRef, { title: capitalizedTitle });
-    }
+  // ---------- styles you already had ----------
+  const boardItemStyle = {
+    background:
+      "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(188,205,212,1) 50%, rgba(168,153,150,1) 100%)",
+    borderRadius: "var(--card-radius)",
+    overflow: "hidden",
+    boxShadow: "0 6px 18px rgba(12,12,16,0.05)",
+    cursor: "pointer",
+    position: "relative",
   };
 
-  const handleDelete = async (boardId) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this board?");
-    if (!confirmDelete) return;
-    try {
-      const boardRef = doc(db, "boards", boardId);
-      const imagesRefCol = collection(boardRef, "images");
-      const imagesSnap = await getDocs(imagesRefCol);
-      const imageDeletes = imagesSnap.docs.map((d) => deleteDoc(d.ref));
-      const collabRef = collection(boardRef, "collaborators");
-      const collabSnap = await getDocs(collabRef);
-      const collabDeletes = collabSnap.docs.map((d) => deleteDoc(d.ref));
-      await Promise.all([...imageDeletes, ...collabDeletes]);
-      await deleteDoc(boardRef);
-    } catch (err) {
-      console.error("Error deleting board:", err);
-      alert("Failed to delete the board. Try again.");
-    }
+  const styles = {
+    mainImage: {
+      borderRadius: "10px",
+      overflow: "hidden",
+      background: "#ddd",
+    },
+    mainImageImg: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      objectPosition: "top center",
+    },
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpenFor(null);
-      if (viewPopoverRef.current && !viewPopoverRef.current.contains(e.target)) setViewPopoverOpen(false);
+  // ---------- Responsive grid logic ----------
+  // decide columns based on window width
+  function useWindowSize() {
+    const [size, setSize] = useState({
+      width: typeof window !== "undefined" ? window.innerWidth : 1200,
+      height: typeof window !== "undefined" ? window.innerHeight : 800,
+    });
+    useEffect(() => {
+      const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
+    return size;
+  }
+
+  const { width } = useWindowSize();
+
+  // breakpoints — tweak these if you like
+  const getColumns = () => {
+    if (width < 640) return 1; // mobile
+    if (width < 900) return 2; // small tablet
+    if (width < 1200) return 3; // laptop
+    return 4; // large desktop
+  };
+
+  const columns = getColumns();
+
+  const gridStyle = {
+    display: "grid",
+    gridTemplateColumns: `repeat(${columns}, 1fr)`,
+    gap: 12,
+    alignItems: "start",
+  };
+
+  // ---------- Card sizing that scales inside each grid cell ----------
+  // We switched main/preview to percentage widths so they scale inside each grid cell.
+  const SIZES = {
+    // tweak these percentages to change visual proportions inside card
+    mainPercent: 0.62, // main image gets ~62% of the card width
+    previewPercent: 0.38,
+    mainHeight: 180, // px height for the visual. Change to suit your design.
+    gap: 8,
+  };
+
+  const coverStyles = {
+    wrapper: { display: "flex", gap: SIZES.gap, alignItems: "stretch", marginTop: 10 },
+    mainWrap: {
+      width: `${Math.round(SIZES.mainPercent * 100)}%`,
+      height: SIZES.mainHeight,
+      borderRadius: 6,
+      overflow: "hidden",
+      background: "#eaeaea",
+      flexShrink: 0,
+    },
+    mainImg: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block",
+    },
+    previewColumn: {
+      width: `${Math.round(SIZES.previewPercent * 100)}%`,
+      display: "flex",
+      flexDirection: "column",
+      gap: Math.max(4, Math.round(SIZES.gap / 2)),
+      alignItems: "stretch",
+    },
+    previewImg: {
+      width: "100%",
+      height: `calc(${SIZES.mainHeight / 2}px - ${Math.round(SIZES.gap / 2)}px)`,
+      borderRadius: 6,
+      overflow: "hidden",
+      background: "#eee",
+      objectFit: "cover",
+      display: "block",
+      cursor: "pointer",
+    },
+  };
+
+  const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
+
+  // BoardCard identical to before but adapted to percent widths (so it scales in grid)
+  function BoardCard({ board, imgs }) {
+    const initial = [imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder];
+    const [cardImgs, setCardImgs] = useState(initial);
+
+    const onPreviewClick = (previewIndex) => {
+      const newImgs = [...cardImgs];
+      [newImgs[0], newImgs[previewIndex]] = [newImgs[previewIndex], newImgs[0]];
+      setCardImgs(newImgs);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  // filtered boards based on search term (case-insensitive)
-  const filteredBoards = boards.filter((b) =>
-    b.title ? b.title.toLowerCase().includes(searchTerm.trim().toLowerCase()) : false
-  );
-
-  return (
-    <div style={{ marginTop: "1.5rem" }}>
-      {/* DO NOT style `body` here — scope to the component root  */}
-
-      {/* Top controls area */}
-      <div style={{ marginBottom: "1rem", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <div />
+    return (
+      <div style={coverStyles.wrapper}>
+        <div style={coverStyles.mainWrap}>
+          <img alt={`board-main-${board.id}`} src={cardImgs[0]} style={{ ...coverStyles.mainImg, ...styles.mainImageImg }} />
         </div>
 
-        {/* Search + view button row */}
-        {false && <div className="search-row">
-          <div className="search-input" role="search" aria-label="Search boards">
-            <MdSearch size={18} style={{ opacity: 0.6 }} />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search boards by title..."
-              aria-label="Search boards"
+        <div style={coverStyles.previewColumn}>
+          {[1, 2].map((i) => (
+            <img
+              key={i}
+              alt={`preview-${i}`}
+              src={cardImgs[i]}
+              onClick={() => onPreviewClick(i)}
+              style={coverStyles.previewImg}
             />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm("")} className="clear-btn" aria-label="Clear search">
-                ×
-              </button>
-            )}
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-          </div>
+  // ---------- Render ----------
+  return (
+    <div>
+      {boards.length === 0 ? <h4 style={{ textAlign: "center" }}>No boards found</h4> : null}
 
-          {/* view popover toggle */}
-          <div style={{ position: "relative" }} ref={viewPopoverRef}>
-            <button
-              title="Change view"
-              aria-label="Change view"
-              onClick={() => setViewPopoverOpen((s) => !s)}
+      {/* Grid container: responsive columns */}
+      <div style={gridStyle}>
+        {boards.map((board) => {
+          const imgs = latestboardimages[board.id] || [];
+          const to = `/board/${board.id}`;
+          return (
+            <Link
+              key={board.id}
+              to={to}
               style={{
-                width: 44,
-                height: 44,
+                ...boardItemStyle,
+                display: "block",
+                padding: 12,
                 borderRadius: 10,
-                border: "1px solid #e6e6ea",
-                background: "#fff",
-                display: "grid",
-                placeItems: "center",
-                cursor: "pointer",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                textDecoration: "none",
+                color: "inherit",
+                overflow: "hidden",
+                marginBottom: 0, // grid manages spacing
+                minHeight: SIZES.mainHeight + 40,
               }}
             >
-              <MdMoreVert size={20} />
-            </button>
+              <strong>{board.title || "Untitled Board"}</strong>
 
-            {viewPopoverOpen && (
-              <div className="view-popover" role="dialog" aria-label="View options">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div className="segmented-pill" role="tablist" aria-label="View mode">
-                    {isMobile && (
-                      <button
-                        className={`seg-btn ${viewMode === "wide" ? "active" : ""}`}
-                        onClick={() => {
-                          setViewMode("wide");
-                          setViewPopoverOpen(false);
-                        }}
-                        title="Wide view"
-                        aria-pressed={viewMode === "wide"}
-                      >
-                        <MdViewModule size={18} />
-                      </button>
-                    )}
-
-                    <button
-                      className={`seg-btn ${viewMode === "compact" ? "active" : ""}`}
-                      onClick={() => { setViewMode("compact"); setViewPopoverOpen(false); }}
-                      title="Compact view"
-                      aria-pressed={viewMode === "compact"}
-                    >
-                      <MdViewDay size={18} />
-                    </button>
-
-                    <button
-                      className={`seg-btn ${viewMode === "plain" ? "active" : ""}`}
-                      onClick={() => { setViewMode("plain"); setViewPopoverOpen(false); }}
-                      title="Plain list"
-                      aria-pressed={viewMode === "plain"}
-                    >
-                      <MdTextFields size={18} />
-                    </button>
-                  </div>
-
-                  <div className="seg-labels" aria-hidden="true" style={{ marginLeft: 8 }}>
-                    {isMobile && <div style={{ opacity: viewMode === "wide" ? 1 : 0.5 }}>Wide</div>}
-                    <div style={{ opacity: viewMode === "compact" ? 1 : 0.5 }}>Compact</div>
-                    <div style={{ opacity: viewMode === "plain" ? 1 : 0.5 }}>Plain</div>
-                  </div>
-                </div>
+              {/* card cover (main-left, previews-right) */}
+              <div style={{ marginTop: 8 }}>
+                <BoardCard board={board} imgs={imgs} />
               </div>
-            )}
-          </div>
-        </div>}
-      </div>
-
-      {filteredBoards.length === 0 && <p>No boards to show</p>}
-
-      <div className={`board-grid ${viewMode}`}>
-        {filteredBoards.map((board) => {
-          const imgs = cachedLatestImages[board.id] || latestboardimages[board.id] || [];
-          return (
-            <div
-              key={board.id}
-              className="board-item"
-              onClick={() => navigate(`/board/${board.id}`, { state: { from: location.pathname } })}
-            >
-              <div className="board-cover">
-                <div className="main-image">
-                  {imagesLoading ? (
-                    <div className="skeleton rect" />
-                  ) : (
-                    <img
-                      src={
-                        imgs[0] ||
-                        "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                      }
-                      alt=""
-                    />
-                  )}
-                </div>
-                <div className="preview-images">
-                  {imagesLoading ? (
-                    <>
-                      <div className="skeleton preview-skeleton" />
-                      <div className="skeleton preview-skeleton" />
-                    </>
-                  ) : (
-                    <>
-                      <img
-                        src={
-                          imgs[1] ||
-                          "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                        }
-                        alt=""
-                      />
-                      <img
-                        src={
-                          imgs[2] ||
-                          "https://e1.pxfuel.com/desktop-wallpaper/472/398/desktop-wallpaper-plain-white-gallery-white-plain.jpg"
-                        }
-                        alt=""
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="board-info">
-                <h4 className="board-title">{board.title}</h4>
-                <div className="board-meta">
-                  {board.ownerId === user.uid ? "👑 You own this board" : "🤝 Shared with you"}
-                </div>
-              </div>
-
-              {menuOpenFor === board.id && (
-                <div
-                  ref={menuRef}
-                  style={{
-                    position: "absolute",
-                    top: "40px",
-                    right: "10px",
-                    background: "#fff",
-                    border: "1px solid #ddd",
-                    borderRadius: "6px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    zIndex: 1000,
-                    overflow: "hidden",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div
-                    onClick={() => { setMenuOpenFor(null); handleRename(board.id, board.title); }}
-                    style={{ padding: "10px 14px", fontSize: "14px", cursor: "pointer", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: "8px" }}
-                  >
-                    <MdEdit size={18} /> Rename
-                  </div>
-                  <div
-                    onClick={() => { setMenuOpenFor(null); handleDelete(board.id); }}
-                    style={{ padding: "10px 14px", fontSize: "14px", cursor: "pointer", color: "red", display: "flex", alignItems: "center", gap: "8px" }}
-                  >
-                    <FiTrash2 size={18} /> Delete
-                  </div>
-                </div>
-              )}
-            </div>
+            </Link>
           );
         })}
       </div>
