@@ -146,24 +146,7 @@ const [dragActive, setDragActive] = useState(false);
 
 
   const handleBack = () => {
-    // if (location.state && location.state.from) {
-    //   navigate(location.state.from);
-    //   return;
-    // }
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    try {
-      if (document.referrer) {
-        const ref = new URL(document.referrer);
-        if (ref.origin === window.location.origin) {
-          navigate(-1);
-          return;
-        }
-      }
-    } catch (err) {}
-    navigate('/');
+    navigate(-1);
   };
 
 // helper: split into chunks (Firestore 'in' supports up to 10)
