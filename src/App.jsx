@@ -224,35 +224,160 @@ export default function App() {
               )}
             </button>
 
-            {/* dropdown */}
-            {notifOpen && (
-              <div style={{ position: 'absolute', right: 0, top: '36px', left: '-190px', width: 320, maxWidth: 'calc(100vw - 32px)', background: '#bedfe0ff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.52)', zIndex: 200, padding: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 6px' }}>
-                  <strong>Notifications</strong>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => navigate('/notifications')} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>View all</button>
+            {/* polished notifications dropdown */}
+            {notifOpen && ( 
+              <>
+                {/* inline keyframes + custom scrollbar so no external CSS file needed */}
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @keyframes dropdown-fade-slide { from { opacity: 0; transform: translateY(-6px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+                  @keyframes accent-pulse { 0% { transform: scaleY(1); opacity: 1 } 40% { transform: scaleY(1.25); opacity: 1 } 100% { transform: scaleY(1); opacity: 1 } }
+                  /* thin custom scrollbar */
+                  .pp-notif-list::-webkit-scrollbar { width: 8px; }
+                  .pp-notif-list::-webkit-scrollbar-track { background: transparent; }
+                  .pp-notif-list::-webkit-scrollbar-thumb { background: rgba(10,10,12,0.12); border-radius: 8px; }
+                ` }} />
+
+                <div
+                  role="menu"
+                  aria-label="Notifications"
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "36px",
+                    width: 320,
+                    maxWidth: "calc(100vw - 32px)",
+                    background: "linear-gradient(135deg, rgba(190,223,224,1) 0%, rgba(217,238,241,0.9) 50%, rgba(255,255,255,0.98) 100%)",
+                    borderRadius: 10,
+                    boxShadow: "0 18px 40px rgba(6,12,20,0.18)",
+                    zIndex: 200,
+                    padding: 8,
+                    transformOrigin: "top right",
+                    animation: "dropdown-fade-slide 220ms cubic-bezier(.2,.9,.2,1)",
+                  }}
+                >
+                  {/* header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 6px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <strong style={{ fontSize: 15, letterSpacing: "-0.2px", color: "#05333a" }}>Notifications</strong>
+                      <span style={{ fontSize: 12, color: "#0b6b7a", background: "rgba(255,255,255,0.5)", padding: "4px 8px", borderRadius: 999 }}>{notifications.filter(n => !n.read).length} new</span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => navigate("/notifications")}
+                        style={{ background: "transparent", border: "none", cursor: "pointer", padding: 6, color: "#074a52", fontWeight: 600, borderRadius: 8 }}
+                        title="View all notifications"
+                      >
+                        View all
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* list */}
+                  <div className="pp-notif-list" style={{ maxHeight: 300, overflowY: "auto", padding: "6px" }}>
+                    {notifications.length === 0 && (
+                      <div style={{ padding: 12, color: "#4b5563", borderRadius: 8, textAlign: "center", background: "linear-gradient(180deg,#fff,#f6fbff)" }}>
+                        No notifications
+                      </div>
+                    )}
+
+                    {notifications.slice(0, 12).map((n) => {
+                      // friendly relative time
+                      const timeStr = (n.createdAt && n.createdAt.seconds)
+                        ? (() => { const ms = n.createdAt.seconds * 1000; const diff = Math.round((Date.now() - ms) / 60000); return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`; })()
+                        : "";
+
+                      const isUnread = !n.read;
+
+                      return (
+                        <div
+                          key={n.id}
+                          role="menuitem"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleOpenNotification(n); }}
+                          onClick={() => handleOpenNotification(n)}
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            padding: 10,
+                            borderRadius: 8,
+                            alignItems: "flex-start",
+                            marginBottom: 6,
+                            cursor: "pointer",
+                            background: isUnread ? "linear-gradient(90deg, rgba(240,251,255,1), rgba(255,255,255,0.98))" : "transparent",
+                            border: isUnread ? "1px solid rgba(11,107,122,0.06)" : "1px solid rgba(6,8,10,0.02)",
+                            boxShadow: isUnread ? "0 8px 20px rgba(8,12,16,0.04)" : "none",
+                            transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 28px rgba(8,12,16,0.06)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
+                        >
+                          {/* left accent + avatar placeholder */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                            <div
+                              aria-hidden
+                              style={{
+                                width: 8,
+                                height: 52,
+                                borderRadius: 6,
+                                background: isUnread ? "linear-gradient(180deg,#1B99BF,#EE6C4D)" : "linear-gradient(180deg,#dfeff1,#ebf6f8)",
+                                boxShadow: isUnread ? "0 8px 20px rgba(27,153,159,0.12)" : "none",
+                                ...(isUnread ? { animation: "accent-pulse 900ms ease-in-out 1" } : {}),
+                                flexShrink: 0
+                              }}
+                            />
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#fff", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)", display: "none" }} />
+                          </div>
+
+                          {/* content */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#042b2f" }}>{(n.type || "Activity").replace(/_/g, " ")}</div>
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>{timeStr}</div>
+                              </div>
+                            </div>
+
+                            <div style={{ marginTop: 6, fontSize: 13, color: "#0f1724" }}>
+                              {n.text}
+                            </div>
+                          </div>
+
+                          {/* actions */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleOpenNotification(n); }}
+                              style={{ border: "none", background: "transparent", color: "#075b63", cursor: "pointer", padding: "6px 8px", borderRadius: 8 }}
+                            >
+                              Open
+                            </button>
+
+                            {!n.read && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); markNotificationRead(n); }}
+                                style={{
+                                  border: "none",
+                                  background: "linear-gradient(90deg,#1B99BF,#2B5FA8)",
+                                  color: "#fff",
+                                  padding: "6px 8px",
+                                  borderRadius: 8,
+                                  cursor: "pointer",
+                                  fontWeight: 700,
+                                  fontSize: 13
+                                }}
+                              >
+                                Mark
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-
-                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                  {notifications.length === 0 && <div style={{ padding: 10, color: '#666' }}>No notifications</div>}
-                  {notifications.slice(0, 12).map((n) => (
-                    <div key={n.id} style={{ display: 'flex', gap: 10, padding: 8, borderRadius: 6, alignItems: 'flex-start', background: n.read ? 'transparent' : 'linear-gradient(90deg,#f0fbff,#ffffff)' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 8, background: '#eee', flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{n.type?.replace('_', ' ') || 'Activity'}</div>
-                        <div style={{ fontSize: 13, color: '#333' }}>{n.text}</div>
-                        <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>{(n.createdAt && n.createdAt.seconds) ? (() => { const ms = n.createdAt.seconds * 1000; const diff = Math.round((Date.now() - ms) / 60000); return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`; })() : ''}</div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button onClick={() => handleOpenNotification(n)} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Open</button>
-                        {!n.read && <button onClick={() => markNotificationRead(n)} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Mark</button>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </>
             )}
+
           </div>
 
           {/* Profile avatar replaces the logout button */}

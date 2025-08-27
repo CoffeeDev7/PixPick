@@ -174,6 +174,9 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
     gridTemplateColumns: `repeat(${columns}, 1fr)`,
     gap: 12,
     alignItems: "start",
+    background: "linear-gradient(90deg, rgba(27,153,159,1) 0%, rgba(87,173,199,1) 50%, rgba(238,108,77,1) 100%)",
+    padding: 12,
+    borderRadius: 12,
   };
 
   // ---------- Card sizing that scales inside each grid cell ----------

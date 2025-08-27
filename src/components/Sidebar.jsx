@@ -14,7 +14,7 @@ export default function Sidebar({
   onSearch, // optional callback: (query) => {}
   onCreateClick, // optional callback: () => {}
 }) {
-  const tabs = ['My Boards', 'Shared with Me', 'All Boards'];
+  const tabs = ['My Boards', 'Shared with Me'];
   const navigate = useNavigate();
 
   const handleTabClick = (tab) => {
