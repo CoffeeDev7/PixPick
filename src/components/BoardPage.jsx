@@ -1145,7 +1145,7 @@ const handleDragLeave = (event) => {
           <span style={{ fontSize: 13 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
           </button>
          <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <img src="/public/comment-5-svgrepo-com.svg" alt="Comments" style={{ width: 18, height: 18 }} />
+            <img src="/public/comment-5-svgrepo-com (1).svg" alt="Comments" style={{ width: 18, height: 18 }} />
             <span style={{ fontSize: 13, color: '#444' }}>{boardCommentsCount}</span>
           </button>
 
@@ -1615,7 +1615,6 @@ const handleDragLeave = (event) => {
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Write a comment..."
-                    autoFocus
                     style={{
                       flex: 1,
                       padding: "12px 14px",
@@ -1904,7 +1903,6 @@ const handleDragLeave = (event) => {
               value={boardCommentText}
               onChange={(e) => setBoardCommentText(e.target.value)}
               placeholder="Write a comment..."
-              autoFocus
               style={{
                 flex: 1,
                 padding: "12px 14px",
