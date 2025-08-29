@@ -12,7 +12,7 @@ import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
-
+import Friends from './components/Friends';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -684,6 +684,7 @@ useEffect(() => {
               </Suspense> }
           />
           <Route path="/notifications" element={<NotificationsPage user={user} />} />
+          <Route path="/friends" element={<Friends user={user} />} />
         </Routes>
       </div>
 
