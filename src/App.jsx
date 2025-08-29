@@ -31,12 +31,9 @@ export default function App() {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRefDom = useRef(null);
 
-  // track previous notification IDs to detect new ones
-  const prevNotifIdsRef = useRef(new Set());
-
   // desktop toast state (tiny ephemeral notification animation)
   const [desktopNotif, setDesktopNotif] = useState(null); // {id, title, text}
-  const desktopTimerRef = useRef(null);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -47,50 +44,110 @@ export default function App() {
   }, []);
 
   // realtime notifications listener for current user (simple, client-side)
-  useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      prevNotifIdsRef.current = new Set();
-      return;
-    }
+  // Add these refs in your component body (near other refs)
+const prevNotifIdsRef = useRef(new Set());
+const desktopTimerRef = useRef(null);
+const actorProfileCacheRef = useRef(new Map()); // caches { uid -> { photoURL, displayName } }
 
-    const q = query(collection(db, 'users', user.uid, 'notifications'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+// Helper to normalize ids
+const norm = (s) => String(s || "").trim();
 
-        // detect newly added notifications (ids not in prev set)
-        const prevSet = prevNotifIdsRef.current;
-        const newDocs = list.filter((n) => !prevSet.has(n.id));
+/* ---------- Snapshot listener (replace your existing desktop listener) ---------- */
+useEffect(() => {
+  if (!user) {
+    setNotifications([]);
+    prevNotifIdsRef.current = new Set();
+    return;
+  }
 
-        if (newDocs.length > 0) {
-          // update prev set first for future diffs
-          prevNotifIdsRef.current = new Set(list.map((n) => n.id));
+  let isFirstSnapshot = true;
 
-          // show desktop toast for the most recent new notif that isn't from the current user
-          const newest = newDocs[0];
-          if (newest && newest.actor !== user.uid) {
-            // ephemeral desktop toast
-            setDesktopNotif({ id: newest.id, title: newest.type?.replace('_', ' ') || 'Activity', text: newest.text });
-            // clear any previous timer
-            if (desktopTimerRef.current) clearTimeout(desktopTimerRef.current);
-            desktopTimerRef.current = setTimeout(() => setDesktopNotif(null), 5000);
-          }
-        } else if (prevSet.size === 0 && list.length > 0) {
-          // initial load — populate prev set
-          prevNotifIdsRef.current = new Set(list.map((n) => n.id));
-        }
+  const q = query(
+    collection(db, "users", user.uid, "notifications"),
+    orderBy("createdAt", "desc")
+  );
 
-        setNotifications(list);
-      },
-      (err) => {
-        console.error('notifications onSnapshot error', err);
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map((d) => ({ id: norm(d.id), ...d.data() }));
+
+      // update notifications state immediately
+      setNotifications(list);
+
+      if (isFirstSnapshot) {
+        // populate prev set and skip toasts on initial load
+        prevNotifIdsRef.current = new Set(list.map((n) => norm(n.id)));
+        isFirstSnapshot = false;
+        return;
       }
-    );
 
-    return () => unsub();
-  }, [user]);
+      // find new & unread notifications not created by current user
+      const prevSet = prevNotifIdsRef.current;
+      const newUnread = list.filter(
+        (n) => !prevSet.has(norm(n.id)) && n.read !== true && n.actor !== user.uid
+      );
+
+      // update prev set for future diffs
+      prevNotifIdsRef.current = new Set(list.map((n) => norm(n.id)));
+
+      if (newUnread.length > 0) {
+        const newest = newUnread[0]; // most recent new unread
+
+        // fetch actor profile if not cached; use an async IIFE so onSnapshot isn't async
+        (async () => {
+          let actorPhoto = "";
+          let actorName = "";
+
+          try {
+            const cached = actorProfileCacheRef.current.get(newest.actor);
+            if (cached) {
+              actorPhoto = cached.photoURL || "";
+              actorName = cached.displayName || "";
+            } else {
+              // try to read users/{actor} doc
+              const snap = await getDoc(doc(db, "users", newest.actor));
+              if (snap.exists()) {
+                const d = snap.data() || {};
+                actorPhoto = d.photoURL || "";
+                actorName = d.displayName || "";
+                actorProfileCacheRef.current.set(newest.actor, { photoURL: actorPhoto, displayName: actorName });
+              }
+            }
+          } catch (err) {
+            // swallow fetch errors and show fallback UI
+            console.warn("Could not fetch actor profile for desktop toast", err);
+          }
+
+          // show desktop toast with actor photo (or fallback)
+          setDesktopNotif({
+            id: newest.id,
+            title: (newest.type || "Activity").replace(/_/g, " "),
+            text: newest.text,
+            actorPhoto,
+            actorName,
+          });
+
+          // 3s auto-dismiss
+          if (desktopTimerRef.current) clearTimeout(desktopTimerRef.current);
+          desktopTimerRef.current = setTimeout(() => setDesktopNotif(null), 3000);
+        })();
+      }
+    },
+    (err) => {
+      console.error("notifications onSnapshot error (desktop):", err);
+    }
+  );
+
+  return () => {
+    if (desktopTimerRef.current) {
+      clearTimeout(desktopTimerRef.current);
+      desktopTimerRef.current = null;
+    }
+    unsub();
+  };
+}, [user]); // re-run on user change
+
 
   // clear desktop toast timer on unmount
   useEffect(() => {
@@ -263,7 +320,7 @@ export default function App() {
 
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
-                        onClick={() => navigate("/notifications")}
+                        onClick={() => {navigate("/notifications"); setNotifOpen(false);}}
                         style={{ background: "transparent", border: "none", cursor: "pointer", padding: 6, color: "#074a52", fontWeight: 600, borderRadius: 8 }}
                         title="View all notifications"
                       >
@@ -439,21 +496,145 @@ export default function App() {
       )}
 
       {/* Desktop ephemeral notification toast (bottom-right of header) */}
-      {desktopNotif && (
-        <div style={{ position: 'fixed', top: 56, right: 16, zIndex: 300, animation: 'desktop-toast-in 320ms ease' }}>
-          <div style={{ background: '#fff', borderRadius: 10, padding: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', minWidth: 260, display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 8, background: '#eef7ff', display: 'grid', placeItems: 'center', fontWeight: 700 }}>{desktopNotif.title?.charAt(0)}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700 }}>{desktopNotif.title}</div>
-              <div style={{ color: '#444', marginTop: 4, fontSize: 13 }}>{desktopNotif.text}</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button onClick={() => { /* open notification */ const n = notifications.find(x => x.id === desktopNotif.id); if (n) handleOpenNotification(n); setDesktopNotif(null); }} style={{ border: 'none', background: '#2b5fa8', color: '#fff', padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}>Open</button>
-              <button onClick={() => setDesktopNotif(null)} style={{ border: 'none', background: 'transparent', color: '#666', cursor: 'pointer' }}>Dismiss</button>
-            </div>
-          </div>
+      {/* ---------- Polished glassy desktop toast (render in your JSX) ---------- */}
+
+{/* inline keyframes for toast animation + optional small style block */}
+<style dangerouslySetInnerHTML={{
+  __html: `
+    @keyframes desktop-toast-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes desktop-toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px) scale(.99); } }
+  `
+}} />
+
+{/* Desktop ephemeral notification toast (top-right of header) */}
+{/* ---------- Polished desktop toast JSX (replace the avatar block with this) ---------- */}
+
+{/* Desktop ephemeral notification toast (top-right of header) */}
+{desktopNotif && (
+  <div
+    aria-live="polite"
+    style={{
+      position: "fixed",
+      top: 64,
+      right: 20,
+      zIndex: 300,
+      pointerEvents: "auto",
+      animation: "desktop-toast-in 300ms cubic-bezier(.2,.9,.2,1) forwards",
+    }}
+  >
+    <div
+      style={{
+        backdropFilter: "blur(12px) saturate(1.05)",
+        WebkitBackdropFilter: "blur(12px) saturate(1.05)",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.62), rgba(250,252,253,0.56))",
+        borderRadius: 14,
+        padding: "12px 14px",
+        boxShadow: "0 14px 44px rgba(6,12,20,0.18)",
+        minWidth: 300,
+        display: "flex",
+        gap: 12,
+        alignItems: "center",
+        border: "1px solid rgba(255,255,255,0.32)",
+      }}
+    >
+      {/* Avatar: use actorPhoto if present, else fallback initial tile */}
+      {desktopNotif.actorPhoto ? (
+        <img
+          src={desktopNotif.actorPhoto}
+          alt={desktopNotif.actorName || desktopNotif.title || "user"}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 10,
+            objectFit: "cover",
+            display: "block",
+            flexShrink: 0,
+            boxShadow: "0 6px 18px rgba(6,12,16,0.08)",
+            border: "1px solid rgba(255,255,255,0.45)",
+          }}
+          onError={(e) => {
+            // fallback to initial tile if image fails to load
+            e.currentTarget.style.display = "none";
+            // show fallback initial by forcing update to include no actorPhoto
+            setDesktopNotif((prev) => (prev ? { ...prev, actorPhoto: "" } : prev));
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 10,
+            background: "linear-gradient(135deg,#e6f7ff,#f3fbff)",
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 800,
+            color: "#1b6f86",
+            fontSize: 18,
+            flexShrink: 0,
+            boxShadow: "0 6px 18px rgba(6,12,16,0.06)",
+            border: "1px solid rgba(255,255,255,0.45)",
+          }}
+        >
+          {desktopNotif.actorName?.charAt(0) || desktopNotif.title?.charAt(0) || "A"}
         </div>
       )}
+
+      {/* text */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, color: "#052b2f", fontSize: 15, lineHeight: 1 }}>
+          {desktopNotif.title}
+        </div>
+        <div style={{ marginTop: 6, color: "rgba(6,12,16,0.78)", fontSize: 13, lineHeight: 1.35 }}>
+          {desktopNotif.text}
+        </div>
+      </div>
+
+      {/* actions */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <button
+          onClick={() => {
+            const n = notifications.find((x) => x.id === desktopNotif.id);
+            if (n) handleOpenNotification(n);
+            setDesktopNotif(null);
+            if (desktopTimerRef.current) { clearTimeout(desktopTimerRef.current); desktopTimerRef.current = null; }
+          }}
+          style={{
+            border: "none",
+            background: "linear-gradient(90deg,#1B99BF,#2B5FA8)",
+            color: "#fff",
+            padding: "8px 10px",
+            borderRadius: 10,
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: 13,
+            boxShadow: "0 8px 22px rgba(27,153,159,0.12)",
+          }}
+        >
+          Open
+        </button>
+
+        <button
+          onClick={() => {
+            setDesktopNotif(null);
+            if (desktopTimerRef.current) { clearTimeout(desktopTimerRef.current); desktopTimerRef.current = null; }
+          }}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "rgba(6,12,16,0.6)",
+            cursor: "pointer",
+            fontSize: 13,
+            padding: "4px 6px",
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Sidebar Modal Overlay */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: sidebarVisible ? 'rgba(0,0,0,0.3)' : 'transparent', pointerEvents: sidebarVisible ? 'auto' : 'none', transition: 'background-color 0.3s ease', zIndex: 100 }} onClick={() => setSidebarVisible(false)}>

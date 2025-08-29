@@ -7,6 +7,7 @@ import {
   onSnapshot,
   updateDoc,
   doc,
+  getDocs
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -35,37 +36,88 @@ export default function NotificationsPage({ user }) {
   const confettiRef = useRef(null);
 
   useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-    const q = query(
-      collection(db, "users", user.uid, "notifications"),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  if (!user) return;
+  setLoading(true);
 
-      // detect newly added ids (present in docs but not in prev)
-      const newIds = docs
-        .map((d) => d.id)
-        .filter((id) => !prevIdsRef.current.includes(id));
+  const prevKey = `notif_seen_${user.uid}`;
 
-      if (newIds.length) {
-        // add them to animating set for short period
-        newIds.forEach((id) => animatingIdsRef.current.add(id));
-        // schedule removal after animation (2.4s)
-        setTimeout(() => {
-          newIds.forEach((id) => animatingIdsRef.current.delete(id));
-          // force rerender to clear animation states
-          setNotifications((prev) => [...prev]);
-        }, 2400);
+  // load stored seen ids for this user (if any)
+  try {
+    const stored = localStorage.getItem(prevKey);
+    if (stored) {
+      prevIdsRef.current = JSON.parse(stored).map(id => String(id || '').trim());
+      console.log('[Notifications] loaded prevIds from localStorage (normalized)', prevIdsRef.current);
+    } else {
+      prevIdsRef.current = [];
+      console.log('[Notifications] no prevIds in localStorage');
+    }
+  } catch (e) {
+    prevIdsRef.current = [];
+    console.warn('[Notifications] could not read localStorage', e);
+  }
+
+  let isFirstSnapshot = true;
+  const q = query(
+    collection(db, "users", user.uid, "notifications"),
+    orderBy("createdAt", "desc")
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const docs = snap.docs.map((d) => {
+        // normalize id immediately
+        return { id: String(d.id || '').trim(), ...d.data() };
+      });
+
+      console.log('[Notifications] onSnapshot docs (normalized read):', docs.map(d => ({ id: d.id, read: d.read })));
+
+      const currIds = docs.map((d) => d.id);
+      const prevNormalized = (prevIdsRef.current || []).map(id => String(id || '').trim());
+
+      if (!isFirstSnapshot) {
+        // only animate when the server explicitly marks it unread (read === false)
+        const newUnreadIds = docs
+          .filter((d) => d.read === false && !prevNormalized.includes(d.id))
+          .map((d) => d.id);
+
+        console.log('[Notifications] computed newUnreadIds (normalized):', newUnreadIds);
+
+        if (newUnreadIds.length) {
+          newUnreadIds.forEach((id) => animatingIdsRef.current.add(id));
+          setTimeout(() => {
+            newUnreadIds.forEach((id) => animatingIdsRef.current.delete(id));
+            setNotifications((prev) => [...prev]); // force rerender
+          }, 2400);
+        }
+      } else {
+        console.log('[Notifications] skipping animation on first snapshot');
       }
 
-      prevIdsRef.current = docs.map((d) => d.id);
+      // persist normalized ids to localStorage
+      prevIdsRef.current = currIds.map(id => String(id || '').trim());
+      try {
+        localStorage.setItem(prevKey, JSON.stringify(prevIdsRef.current));
+        console.log('[Notifications] saved prevIds to localStorage', prevIdsRef.current);
+      } catch (e) {
+        console.warn('[Notifications] localStorage set failed', e);
+      }
+
       setNotifications(docs);
       setLoading(false);
-    });
-    return () => unsub();
-  }, [user]);
+      isFirstSnapshot = false;
+    },
+    (err) => {
+      console.error('[Notifications] onSnapshot error', err);
+      setLoading(false);
+    }
+  );
+
+  return () => unsub();
+}, [user]);
+
+
+
 
   // helper: friendly relative time string
   function timeAgo(ts) {

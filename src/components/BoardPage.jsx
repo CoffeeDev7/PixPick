@@ -1590,32 +1590,64 @@ const handleDragLeave = (event) => {
                 }}
               >
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={notifyFriends}
-                      onChange={(e) => setNotifyFriends(e.target.checked)}
-                      style={{
-                        width: 18,
-                        height: 18,
-                        accentColor: "#1b99bf",
-                      }}
-                    />
-                    <span style={{ fontSize: 13, color: "#073238", fontWeight: 700 }}>
-                      Notify collaborators
-                    </span>
-                  </label>
+                {/* Toggle button */}
+                <label style={{ position: "relative", display: "inline-block", width: 42, height: 22, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={notifyFriends}
+                    onChange={(e) => setNotifyFriends(e.target.checked)}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: notifyFriends ? "#1b99bf" : "#ccc",
+                      borderRadius: 34,
+                      transition: "0.3s",
+                    }}
+                  ></span>
+                  <span
+                    style={{
+                      position: "absolute",
+                      content: '""',
+                      height: 16,
+                      width: 16,
+                      left: notifyFriends ? "22px" : "4px",
+                      bottom: 3,
+                      backgroundColor: "white",
+                      borderRadius: "50%",
+                      transition: "0.3s",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                    }}
+                  ></span>
+                </label>
 
-                  <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b8b8b" }}>
-                    <span title="If checked, your collaborators will receive a notification about this comment.">Will notify</span>
-                  </div>
+                <span style={{ fontSize: 13, color: "#073238", fontWeight: 700 }}>
+                  Notify collaborators
+                </span>
+
+                <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b8b8b" }}>
+                  <span title="If checked, your collaborators will receive a notification about this comment.">
+                    {notifyFriends ? "Will notify" : "Won't notify"}
+                  </span>
                 </div>
+              </div>
+
 
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Write a comment..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        postComment();
+                      }
+                    }}
                     style={{
                       flex: 1,
                       padding: "12px 14px",
@@ -1884,26 +1916,58 @@ const handleDragLeave = (event) => {
           }}
         >
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={boardNotifyFriends}
-                onChange={(e) => setBoardNotifyFriends(e.target.checked)}
-                style={{ width: 18, height: 18, accentColor: "#1b99bf" }}
-              />
-              <span style={{ fontSize: 13, color: "#073238", fontWeight: 700 }}>Notify collaborators</span>
-            </label>
+  <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+    <div
+      onClick={() => setBoardNotifyFriends(!boardNotifyFriends)}
+      style={{
+        width: 40,
+        height: 22,
+        borderRadius: 22,
+        backgroundColor: boardNotifyFriends ? "#1b99bf" : "#d1d5db",
+        position: "relative",
+        transition: "background-color 0.3s ease",
+        cursor: "pointer",
+      }}
+    >
+      <div
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          background: "#fff",
+          position: "absolute",
+          top: "50%",
+          left: boardNotifyFriends ? "calc(100% - 20px)" : "2px",
+          transform: "translateY(-50%)",
+          transition: "left 0.3s ease",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+        }}
+      />
+    </div>
+    <span style={{ fontSize: 13, color: "#073238", fontWeight: 700 }}>
+      Notify collaborators
+    </span>
+  </label>
 
-            <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b8b8b" }}>
-              <span title="If checked, your collaborators will receive a notification about this board comment.">Will notify</span>
-            </div>
+  <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b8b8b" }}>
+    <span title="If checked, your collaborators will receive a notification about this board comment.">
+      {boardNotifyFriends ? "Will notify" : "Won’t notify"}
+    </span>
+  </div>
           </div>
+
 
           <div style={{ display: "flex", gap: 8 }}>
             <input
               value={boardCommentText}
               onChange={(e) => setBoardCommentText(e.target.value)}
               placeholder="Write a comment..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { 
+                  e.preventDefault();
+                  postBoardComment();
+                }
+              }}
               style={{
                 flex: 1,
                 padding: "12px 14px",
