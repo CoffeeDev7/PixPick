@@ -338,10 +338,31 @@ useEffect(() => {
                     )}
 
                     {notifications.slice(0, 12).map((n) => {
-                      // friendly relative time
-                      const timeStr = (n.createdAt && n.createdAt.seconds)
-                        ? (() => { const ms = n.createdAt.seconds * 1000; const diff = Math.round((Date.now() - ms) / 60000); return diff < 60 ? `${diff}m` : `${Math.round(diff / 60)}h`; })()
-                        : "";
+                      // friendly relative time formatter
+                    const timeStr = (n.createdAt && n.createdAt.seconds)
+                      ? (() => {
+                          const ms = n.createdAt.seconds * 1000;
+                          const diffMinutes = Math.floor((Date.now() - ms) / 60000);
+
+                          if (diffMinutes < 1) return "just now";
+                          if (diffMinutes < 60) return `${diffMinutes}m`;
+
+                          const diffHours = Math.floor(diffMinutes / 60);
+                          if (diffHours < 24) return `${diffHours}h`;
+
+                          const diffDays = Math.floor(diffHours / 24);
+                          if (diffDays < 7) return `${diffDays}d`;
+
+                          const diffWeeks = Math.floor(diffDays / 7);
+                          if (diffWeeks < 4) return `${diffWeeks}w`;
+
+                          const diffMonths = Math.floor(diffDays / 30);
+                          if (diffMonths < 12) return `${diffMonths}mo`;
+
+                          const diffYears = Math.floor(diffDays / 365);
+                          return `${diffYears}y`;
+                        })()
+                      : "";
 
                       const isUnread = !n.read;
 
