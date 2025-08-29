@@ -3,7 +3,7 @@ import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
 import CreateBoardModal from './components/CreateBoardModal';
-import BoardPage from './components/BoardPage';
+
 import NotificationsPage from './components/Notifications';
 import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -12,8 +12,7 @@ import LoginPage from './components/LoginPage';
 import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
-import { Toaster, toast } from "react-hot-toast";
-import confetti from "canvas-confetti";
+
 
 export default function App() {
   const [user, setUser] = useState(null);

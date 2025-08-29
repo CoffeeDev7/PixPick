@@ -1145,7 +1145,8 @@ const handleDragLeave = (event) => {
           <span style={{ fontSize: 13 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
           </button>
          <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <img src="/public/comment-5-svgrepo-com (1).svg" alt="Comments" style={{ width: 18, height: 18 }} />
+            {/* new svg isn't showing up here for some reason so kept it back*/}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             <span style={{ fontSize: 13, color: '#444' }}>{boardCommentsCount}</span>
           </button>
 

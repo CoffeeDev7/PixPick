@@ -1,7 +1,18 @@
 /* BoardPage.css */
 .boardpage{
+   /* ensure it at least fills the viewport */
+  min-height: 100vh;
+
   background: linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(188,205,212,1) 50%, rgba(168,153,150,1) 100%);
   border-radius: 0px;
+
+  /* make sure it covers and doesn't tile */
+  background-repeat: no-repeat;
+  background-size: cover;
+
+  /* layout helpers so children stack normally */
+  display: flex;
+  flex-direction: column;
 }
 
 .image-grid {
