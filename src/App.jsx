@@ -3,7 +3,7 @@ import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
 import CreateBoardModal from './components/modals/CreateBoardModal';
-
+import BoardPage from './components/BoardPage';
 import NotificationsPage from './components/Notifications';
 import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -245,16 +245,16 @@ useEffect(() => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Lazy load BoardPage with timing log
-  const BoardPage = lazy(async () => {
-    const start = performance.now();
-    const module = await import("./components/BoardPage");
-    const end = performance.now();
-    console.log(
-      `[LazyLoad] BoardPage chunk loaded in ${(end - start).toFixed(2)}ms`
-    );
-    return module;
-  });
+  // // Lazy load BoardPage with timing log
+  // const BoardPage = lazy(async () => {
+  //   const start = performance.now();
+  //   const module = await import("./components/BoardPage");
+  //   const end = performance.now();
+  //   console.log(
+  //     `[LazyLoad] BoardPage chunk loaded in ${(end - start).toFixed(2)}ms`
+  //   );
+  //   return module;
+  // });
 
   return (
     <div className="fade-in" style={{ margin: 0, padding: 0, boxSizing: 'border-box' }}>
@@ -677,12 +677,7 @@ useEffect(() => {
               <BoardList user={user} selected={selected} boardsCache={boardsCache} setBoardsCache={setBoardsCache}/>
             </>
           } />
-          <Route
-            path="/board/:id" element={
-              <Suspense fallback={<div>Loading board...</div>}>
-                <BoardPage user={user} />
-              </Suspense> }
-          />
+          <Route path="/board/:id" element={<BoardPage user={user} />} />
           <Route path="/notifications" element={<NotificationsPage user={user} />} />
           <Route path="/friends" element={<Friends user={user} />} />
         </Routes>
