@@ -959,6 +959,7 @@ const handleDragLeave = (event) => {
     if (!confirmDelete) {
       return;
     }
+    setModalIndex(null); // close modal if open
     try {
       await deleteDoc(doc(db, 'boards', boardId, 'images', imageId));
       showToast('Pick deleted', 'success', 2500);
@@ -1212,7 +1213,7 @@ const handleDragLeave = (event) => {
         style={{
           display: 'block',
           width: '100%',
-          height: '40px',          // default height
+          height: dragActive? '80px':'40px',          // default height
           maxHeight: '200px',      // maximum expanded height
           border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
           background: dragActive ? '#e3f2fd' : 'linear-gradient(90deg,rgba(167, 201, 115, 1) 0%, rgba(6, 103, 112, 1) 55%, rgba(129, 227, 102, 1) 100%)',

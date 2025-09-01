@@ -670,7 +670,7 @@ useEffect(() => {
         <Routes>
           <Route path="/" element={
             <>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
                 <h2 style={{ margin: 0, marginLeft: '12px' }}>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
               </div>
