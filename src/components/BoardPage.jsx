@@ -13,6 +13,7 @@ import Modal from './modals/Modal';
 import CommentsModal from './modals/CommentsModal'; 
 import BoardCommentsModal from './modals/BoardCommentsModal'; 
 import Toast from './Toast';
+import CollaboratorsModal from './modals/CollaboratorsModal';
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -64,6 +65,12 @@ const [dragActive, setDragActive] = useState(false);
   const [boardCommentText, setBoardCommentText] = useState('');
   const boardCommentsUnsubRef = useRef(null);
   const [boardCommentsCount, setBoardCommentsCount] = useState(0);
+
+  // Collaborators modal
+  const [isCollaboratorsModalOpen, setIsCollaboratorsModalOpen] = useState(false);
+
+  const openCollaboratorsModal = () => setIsCollaboratorsModalOpen(true);
+  const closeCollaboratorsModal = () => setIsCollaboratorsModalOpen(false);
 
   // per-image comment counts map { imageId: number }
   const [commentCounts, setCommentCounts] = useState({});
@@ -1168,7 +1175,7 @@ const handleDragLeave = (event) => {
       </div>
 
       {/* Collaborators */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }}>
+      <div onClick={openCollaboratorsModal} style={{ cursor: 'pointer', display: 'flex', width: 'fit-content',alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }} title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}>
         {collaboratorProfiles.map((profile, i) => {
         const photo = profile.photoURL || "/public/eat (1).png"; // fallback image
         const name = profile.displayName || "Unknown User";
@@ -1186,21 +1193,29 @@ const handleDragLeave = (event) => {
               objectFit: 'cover',
               transform: `translateX(-${i * 10}px)`,
               zIndex: collaboratorProfiles.length - i,
-        }}
-    />
-  );
-})}
+            }}
+          />
+
+        );
+        })}
+
+        {/* The new modal component */}
+        <CollaboratorsModal
+          isOpen={isCollaboratorsModalOpen}
+          onClose={closeCollaboratorsModal}
+          collaboratorProfiles={collaboratorProfiles}
+        />
 
       </div>
 
       {/* Paste box */}
       <style>{`
-    @keyframes pulseBorder {
-      0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6); }
-      50% { box-shadow: 0 0 10px 4px rgba(33, 150, 243, 0.9); }
-      100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.3); }
-    }
-  `}</style>
+          @keyframes pulseBorder {
+            0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6); }
+            50% { box-shadow: 0 0 10px 4px rgba(33, 150, 243, 0.9); }
+            100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.3); }
+          }
+      `}</style>
       <textarea
         ref={pasteRef}
         className='my-textarea-input'
