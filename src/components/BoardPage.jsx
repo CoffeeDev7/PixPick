@@ -256,17 +256,17 @@ useEffect(() => {
       });
       const arrays = await Promise.all(fetches);
       const flat = arrays.flat();
-      const map = new Map(flat.map(p => [p.uid, { displayName: p.displayName || 'Unknown', photoURL: p.photoURL || '' }]));
+      const map = new Map(flat.map(p => [p.uid, { displayName: p.displayName || 'Unknown', photoURL: p.photoURL || '' , email: p.email || 'No email' }]));
       const ordered = uids.map(uid => {
-        const got = map.get(uid);
-        const out = got || { displayName: 'Unknown', photoURL: '' };
-        // update cache
-        try {
-          const key = `profile_${uid}`;
-          const toStore = { _cachedAt: Date.now(), data: { displayName: out.displayName, photoURL: out.photoURL } };
-          localStorage.setItem(key, JSON.stringify(toStore));
-        } catch (e) { /* ignore localStorage errors */ }
-        return { uid, ...out };
+          const got = map.get(uid);
+          const out = got || { displayName: 'Unknown', photoURL: '', email: 'Unknown email' };
+          // update cache
+          try {
+            const key = `profile_${uid}`;
+            const toStore = { _cachedAt: Date.now(), data: { displayName: out.displayName, photoURL: out.photoURL, email: out.email } };
+            localStorage.setItem(key, JSON.stringify(toStore));
+          } catch (e) { /* ignore localStorage errors */ }
+          return { uid, ...out };
       });
 
       if (!cancelled) setcollaboratorProfiles(ordered);
@@ -1173,7 +1173,8 @@ const handleDragLeave = (event) => {
           <span style={{ fontSize: '0.9rem', color: '#888', marginTop: '9px' }}>{images.length} {images.length === 1 ? 'pick' : 'picks'} {lastOpenedShort ? (<><span style={{ margin: '0 6px' }}>·</span>{lastOpenedShort}</>) : null}</span>
         </h2>
       </div>
-
+            {console.log('collaborators uids:', collaborators.map(c => c.id))}
+            {console.log('render collaboratorProfiles:', collaboratorProfiles)}
       {/* Collaborators */}
       <div onClick={openCollaboratorsModal} style={{ cursor: 'pointer', display: 'flex', width: 'fit-content',alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }} title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}>
         {collaboratorProfiles.map((profile, i) => {
