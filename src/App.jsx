@@ -2,7 +2,7 @@
 import { Link, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BoardList from './components/BoardList';
-import CreateBoardModal from './components/CreateBoardModal';
+import CreateBoardModal from './components/modals/CreateBoardModal';
 
 import NotificationsPage from './components/Notifications';
 import { auth, provider } from './firebase';

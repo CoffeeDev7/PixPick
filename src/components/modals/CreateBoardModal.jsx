@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase"; // adjust path if needed
+import { db } from "../../firebase"; // adjust path if needed
 import "./CreateBoardModal.css"; // optional: for custom styles
 import confetti from "canvas-confetti";
 
