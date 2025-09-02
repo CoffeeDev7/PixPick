@@ -14,7 +14,9 @@ import CommentsModal from './modals/CommentsModal';
 import BoardCommentsModal from './modals/BoardCommentsModal'; 
 import Toast from './Toast';
 import CollaboratorsModal from './modals/CollaboratorsModal';
+import { supabase } from "../lib/supabase";
 
+const MAX_FIRESTORE_SIZE = 1 * 1024 * 1024; // 1MB
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
@@ -643,16 +645,26 @@ const handlePaste = async (event) => {
     for (let item of event.clipboardData.items) {
       if (item.type && item.type.indexOf('image') === 0) {
         const file = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = async function (e) {
-          // existing function that uploads dataURLs
-          await saveImageToFirestore(e.target.result);
-        };
-        reader.readAsDataURL(file);
+        console.log(`📋 Pasted file detected. Size: ${file.size} bytes`);
+
+        if (file.size > 1 * 1024 * 1024) {
+          // >1MB → Supabase
+          console.log(`➡️ Using Supabase upload (file > 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+          await saveImageToSupabase(file);
+        } else {
+          // <=1MB → Firestore inline (base64)
+          const reader = new FileReader();
+          reader.onload = async function (e) {
+            console.log(`➡️ Using inline upload (file <= 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+            await saveImageToFirestore(e.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
         handled = true;
       }
     }
   }
+
 
   // text fallback (URL or data URL)
   const text = event.clipboardData.getData('text') || '';
@@ -702,7 +714,7 @@ const handlePaste = async (event) => {
     } catch (err) {
       // image didn't load in the client — still attempt server-side import as a fallback
       try {
-        await saveImageUrlToFirestore(text); // server should fetch it
+        await saveImageToFirestore(text); // server should fetch it
         handled = true;
       } catch (err2) {
         console.warn('image import failed:', err2);
@@ -718,19 +730,29 @@ const handlePaste = async (event) => {
   }
 };
 
+
 const handleDrop = async (event) => {
   event.preventDefault();
   let handled = false;
 
-  // 1. Handle file drops (like dragging an image from desktop)
+ // 1. Handle file drops (like dragging an image from desktop)
   if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
     for (let file of event.dataTransfer.files) {
       if (file.type && file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          await saveImageToFirestore(e.target.result);
-        };
-        reader.readAsDataURL(file);
+        console.log(`📥 Dropped file detected. Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+
+        if (file.size > MAX_FIRESTORE_SIZE) {
+          console.log("➡️ Using Supabase upload (file > 1MB)");
+          await saveImageToSupabase(file);
+        } else {
+          console.log("➡️ Using Firestore inline upload (file <= 1MB)");
+          // convert to dataURL and reuse your existing small-image flow
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            await saveImageToFirestore(e.target.result, file.size);
+          };
+          reader.readAsDataURL(file);
+        }
         handled = true;
       }
     }
@@ -741,6 +763,7 @@ const handleDrop = async (event) => {
   if (!handled) {
     const text = event.dataTransfer.getData("text") || "";
     if (text) {
+      console.log("goign old way")
       // Reuse the same logic you already wrote for paste:
       await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
       handled = true;
@@ -755,6 +778,109 @@ const handleDrop = async (event) => {
     event.target.value = "";
   }
 };
+
+// -------------------- Supabase upload for large images --------------------
+// requires setting up Supabase project + storage bucket + API keys
+// see https://supabase.com/docs/guides/storage for details
+// and
+
+
+const saveImageToSupabase = async (file) => {
+  const imageRef = collection(db, "boards", boardId, "images");
+
+  showToast("Dragging this chunky boy to the cloud ... 🐦‍🔥", "info", 20000);
+
+  try {
+    // sanitize filename
+    function sanitizeFileName(name) {
+      return name.replace(/[^a-zA-Z0-9._-]/g, "_"); // safe chars only
+    }
+
+    const fileName = sanitizeFileName(file.name);
+    const path = `boards/${boardId}/${Date.now()}-${fileName}`;
+
+    // Upload to Supabase
+    const { error: uploadError } = await supabase.storage
+      .from("pixpick-images")
+      .upload(path, file);
+
+    if (uploadError) throw uploadError;
+
+    // ⚡️ Generate signed URL (1 week validity for example)
+    const { data: signedData, error: signedError } = await supabase.storage
+      .from("pixpick-images")
+      .createSignedUrl(path, 60 * 60 * 24 * 7); // 7 days
+
+    if (signedError) throw signedError;
+
+    // Save Firestore doc with storage info (keep path so you can re-generate)
+    const docRef = await addDoc(imageRef, {
+      src: signedData.signedUrl, // this is the temp view URL
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      rating: null,
+      storage: {
+        provider: "supabase",
+        path, // keep path for future signed URL refresh
+        size: file.size,
+        contentType: file.type,
+      },
+    });
+
+    console.log(
+      `✅ Uploaded to Supabase: ${(file.size / (1024 * 1024)).toFixed(2)} MB`
+    );
+
+    // refresh board.updatedAt
+    try {
+      const boardRef = doc(db, "boards", boardId);
+      await updateDoc(boardRef, { updatedAt: serverTimestamp() });
+    } catch (err) {
+      console.warn("Could not update board.updatedAt", err);
+    }
+
+    showToast(
+      `File uploaded (${(file.size / (1024 * 1024)).toFixed(2)} MB) ✅`,
+      "success",
+      3500
+    );
+
+    // notifications
+    try {
+      const collabSnap = await getDocs(
+        collection(db, "boards", boardId, "collaborators")
+      );
+      const uids = collabSnap.docs
+        .map((d) => d.id)
+        .filter((uid) => uid && uid !== user.uid);
+
+      if (uids.length > 0) {
+        const payload = {
+          type: "board_activity",
+          text: `${
+            user.displayName || "Someone"
+          } added a pick to ${boardTitle || "your board"}`,
+          createdAt: serverTimestamp(),
+          read: false,
+          boardId,
+          actor: user.uid,
+          url: `/board/${boardId}?image=${docRef.id}`,
+        };
+        await Promise.all(
+          uids.map((uid) =>
+            addDoc(collection(db, "users", uid, "notifications"), payload)
+          )
+        );
+      }
+    } catch (err) {
+      console.warn("Could not create notifications for collaborators", err);
+    }
+  } catch (err) {
+    console.error("❌ Supabase upload failed:", err);
+    showToast("Upload failed — try again", "error", 5000);
+  }
+};
+
 
 const handleDragOver = (event) => {
   event.preventDefault();
@@ -960,21 +1086,49 @@ const handleDragLeave = (event) => {
   };
 
 
-  // delete single image
-  const handleDeleteImage = async (imageId, index) => {
-    const confirmDelete = window.confirm('Delete this pick?');
-    if (!confirmDelete) {
-      return;
+  // delete single image (from Firestore + Supabase if applicable)
+const handleDeleteImage = async (imageId, index) => {
+  const confirmDelete = window.confirm("Delete this pick?");
+  if (!confirmDelete) {
+    return;
+  }
+  setModalIndex(null); // close modal if open
+
+  try {
+    // First get the Firestore doc
+    const imageDocRef = doc(db, "boards", boardId, "images", imageId);
+    const imageDocSnap = await getDoc(imageDocRef);
+
+    if (imageDocSnap.exists()) {
+      const { src } = imageDocSnap.data();
+
+      if (src) {
+        // Extract Supabase storage path from public URL
+        const urlPrefix = import.meta.env.VITE_SUPABASE_URLPREFIX;
+        const storagePath = src.replace(urlPrefix, ""); // e.g. boards/.../filename.png
+
+        // Delete from Supabase
+        const { data, error: supabaseError } = await supabase.storage
+          .from("pixpick-images")
+          .remove([storagePath]);
+
+        if (supabaseError) {
+          console.error("Supabase deletion error:", supabaseError);
+          showToast("Could not delete from storage", "error", 3000);
+          return; // don't delete from Firestore if storage delete fails
+        }
+      }
     }
-    setModalIndex(null); // close modal if open
-    try {
-      await deleteDoc(doc(db, 'boards', boardId, 'images', imageId));
-      showToast('Pick deleted', 'success', 2500);
-    } catch (err) {
-      console.error('delete image error', err);
-      showToast('Could not delete pick', 'error', 3000);
-    }
-  };
+
+    // Delete Firestore doc
+    await deleteDoc(imageDocRef);
+    showToast("Pick deleted", "success", 2500);
+  } catch (err) {
+    console.error("delete image error", err);
+    showToast("Could not delete pick", "error", 3000);
+  }
+};
+
 
   // -------------------- Share board logic --------------------
   const handleShareBoard = async () => {
@@ -1032,28 +1186,66 @@ const handleDragLeave = (event) => {
       }
     }
   };
-  
 
-  const handleDeleteBoard = async (boardIdParam) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this board?');
-    if (!confirmDelete) return;
+const handleDeleteBoard = async (boardIdParam) => {
+  const confirmDelete = window.confirm("Are you sure you want to delete this board?");
+  if (!confirmDelete) return;
 
-    try {
-      const imagesSnap = await getDocs(collection(db, 'boards', boardIdParam, 'images'));
-      await Promise.all(imagesSnap.docs.map((d) => deleteDoc(doc(db, 'boards', boardIdParam, 'images', d.id))));
+  try {
+    // 1. Get all images under this board
+    const imagesSnap = await getDocs(collection(db, "boards", boardIdParam, "images"));
 
-      const collabSnap = await getDocs(collection(db, 'boards', boardIdParam, 'collaborators'));
-      await Promise.all(collabSnap.docs.map((d) => deleteDoc(doc(db, 'boards', boardIdParam, 'collaborators', d.id))));
+    const urlPrefix = import.meta.env.VITE_SUPABASE_URLPREFIX;
+    const storagePaths = [];
 
-      await deleteDoc(doc(db, 'boards', boardIdParam));
+    imagesSnap.forEach((docSnap) => {
+      const { src } = docSnap.data();
+      if (src?.startsWith(urlPrefix)) {
+        const storagePath = src.replace(urlPrefix, ""); // e.g. boards/boardId/file.png
+        storagePaths.push(storagePath);
+      }
+    });
 
-      showToast('Board deleted', 'success', 2000);
-      navigate('/');
-    } catch (err) {
-      console.error('delete board error', err);
-      showToast('Could not delete board', 'error', 3000);
+    // 2. Delete from Supabase in one go
+    if (storagePaths.length > 0) {
+      const { error: supabaseError } = await supabase.storage
+        .from("pixpick-images")
+        .remove(storagePaths);
+
+      if (supabaseError) {
+        console.error("Supabase deletion error:", supabaseError);
+        showToast("Could not delete images from storage", "error", 3000);
+        return; // don’t delete Firestore board if Supabase cleanup fails
+      }
     }
-  };
+
+    // 3. Delete Firestore images
+    await Promise.all(
+      imagesSnap.docs.map((d) =>
+        deleteDoc(doc(db, "boards", boardIdParam, "images", d.id))
+      )
+    );
+
+    // 4. Delete collaborators
+    const collabSnap = await getDocs(collection(db, "boards", boardIdParam, "collaborators"));
+    await Promise.all(
+      collabSnap.docs.map((d) =>
+        deleteDoc(doc(db, "boards", boardIdParam, "collaborators", d.id))
+      )
+    );
+
+    // 5. Delete the board itself
+    await deleteDoc(doc(db, "boards", boardIdParam));
+
+    showToast("Board and all its picks deleted 🎯", "success", 2500);
+    navigate("/");
+  } catch (err) {
+    console.error("delete board error", err);
+    showToast("Could not delete board", "error", 3000);
+  }
+};
+
+
 
   // -------------------- keyboard navigation (unchanged) --------------------
   useEffect(() => {
@@ -1173,8 +1365,7 @@ const handleDragLeave = (event) => {
           <span style={{ fontSize: '0.9rem', color: '#888', marginTop: '9px' }}>{images.length} {images.length === 1 ? 'pick' : 'picks'} {lastOpenedShort ? (<><span style={{ margin: '0 6px' }}>·</span>{lastOpenedShort}</>) : null}</span>
         </h2>
       </div>
-            {console.log('collaborators uids:', collaborators.map(c => c.id))}
-            {console.log('render collaboratorProfiles:', collaboratorProfiles)}
+            
       {/* Collaborators */}
       <div onClick={openCollaboratorsModal} style={{ cursor: 'pointer', display: 'flex', width: 'fit-content',alignItems: 'center', gap: '0px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }} title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}>
         {collaboratorProfiles.map((profile, i) => {
