@@ -21,7 +21,6 @@ export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-
   // Reorder state (jiggle + drag)
 const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag
 const [draggingIndex, setDraggingIndex] = useState(null);
@@ -1314,17 +1313,7 @@ const handleDeleteBoard = async (boardIdParam) => {
             aria-pressed={reorderMode}
             onClick={toggleReorder}
             title={reorderMode ? "Finish reordering" : "Reorder images"}
-            style={{
-              background: reorderMode ? '#1b999f' : 'transparent',
-              color: reorderMode ? '#fff' : '#333',
-              border: 'none',
-              padding: 8,
-              borderRadius: 8,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            className={`onhoverbggrey ${reorderMode ? "active" : ""}`}
           >
             {/* reorder SVG (subtle grid-like icon) */}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={reorderMode ? '#fff' : '#333'} strokeWidth="1.8">
@@ -1335,10 +1324,20 @@ const handleDeleteBoard = async (boardIdParam) => {
             </svg>
           <span style={{ fontSize: 13 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
           </button>
-         <button aria-label="Board comments" onClick={openBoardComments} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* new svg isn't showing up here for some reason so kept it back*/}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-            <span style={{ fontSize: 13, color: '#444' }}>{boardCommentsCount}</span>
+
+          <button aria-label="Board settings"
+            title='Board settings'
+            className='onhoverbggrey'
+            onClick={()=> setSettingsmodal(true)}
+          >
+            {/* gear/settings SVG */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"strokeLinecap="round"strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33  1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51  1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06  a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                  a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06  a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9  a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                  a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9 c0 .66.39 1.26 1 1.51h.09a2 2 0 0 1 0 4h-.09  a1.65 1.65 0 0 0-1.51 1z"
+              />
+            </svg>
           </button>
 
           <div style={{ position: 'relative' }} ref={menuRef}>
@@ -1348,16 +1347,60 @@ const handleDeleteBoard = async (boardIdParam) => {
 
             {showBoardMenu && (
               <div role="menu" style={{ position: 'absolute', right: 0, top: '36px', minWidth: 180, background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, zIndex: 120 }}>
-                <button onClick={handleShareBoard} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: '#e6ffef', cursor: 'pointer', color: '#0b6b2f', borderRadius: 6, fontWeight: 600 }}>Share board</button>
-                <div style={{ height: 8 }} />
-                <button onClick={() => handleRename(boardId, boardTitle)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>Rename</button>
-                <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>Delete board</button>
+                <button onClick={handleShareBoard} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 8, border: 'none', background: '#e6ffef', cursor: 'pointer', color: '#0b6b2f', borderRadius: 6, fontWeight: 600 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  Share board
+                </button>
+
+                <button onClick={() => handleRename(boardId, boardTitle)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                  Rename
+                </button>
+
+                <button
+                  aria-label="Board comments"
+                  onClick={openBoardComments}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    position: "relative",
+                  }}
+                >
+                  {/* chat bubble svg */}
+                  <div style={{ position: "relative", display: "inline-block" }}>
+                    <svg width="20" height="20"  viewBox="0 0 24 24"fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+
+                    {/* count badge */}
+                    {boardCommentsCount > 0 && (
+                      <span
+                        style={{
+                          position: "absolute", top: -6, right: -6, background: "#2d95baff", color: "#fff", borderRadius: "50%", padding: "2px 6px", fontSize: 11, fontWeight: 600, lineHeight: 1, }}
+                      >
+                        {boardCommentsCount}
+                      </span>
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: 16, color: "#0f0f0fff" }}>Board comments</span>
+                </button>
+
+                <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  Delete board
+                </button>
+
               </div>
             )}
           </div>
         </div>
       </div>
-
       {/* h2, picks, last opened */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginLeft: '8px' }}>
         <h2 style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', userSelect: 'none', margin: 0, lineHeight: 1.06, marginBottom: '10px' }}>
@@ -1444,8 +1487,6 @@ const handleDeleteBoard = async (boardIdParam) => {
           e.currentTarget.style.boxShadow = 'none';
         }}
       />
-
-
 
       {/* Images grid */}
       <ImageGrid

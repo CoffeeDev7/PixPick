@@ -241,3 +241,37 @@
   fill: none;
   opacity: 0.92;
 }
+
+/* On Hover make background grey */
+.onhoverbggrey {
+  background: transparent;
+  color: #333;
+  border: none;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  outline: none;
+  transition: background 0.2s ease;
+}
+
+.onhoverbggrey:hover {
+  background: #908c8c; /* grey on hover */
+}
+
+.onhoverbggrey.active {
+  background: #1b999f;
+  color: #fff;
+  outline: none;
+}
+
+.onhoverbggrey:focus {
+  outline: none;            /* remove browser outline */
+  box-shadow: none;         /* in case the UA uses shadow instead */
+}
+
+.onhoverbggrey:focus-visible {
+  outline: none;
+}
