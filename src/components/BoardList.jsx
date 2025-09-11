@@ -120,7 +120,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   // ---------- styles you already had ----------
   const boardItemStyle = {
     background:
-      "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(188,205,212,1) 50%, rgba(168,153,150,1) 100%)",
+      "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
     borderRadius: "var(--card-radius)",
     overflow: "hidden",
     boxShadow: "0 6px 18px rgba(12,12,16,0.05)",
@@ -174,7 +174,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
     gridTemplateColumns: `repeat(${columns}, 1fr)`,
     gap: 12,
     alignItems: "start",
-    background: "linear-gradient(90deg, rgba(27,153,159,1) 0%, rgba(87,173,199,1) 50%, rgba(238,108,77,1) 100%)",
+    background: "linear-gradient(to right top, #408083, #408083, #408083, #408083, #408083)",
     padding: 12,
     borderRadius: 12,
   };
