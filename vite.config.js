@@ -11,7 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@mui/styled-engine': '@mui/styled-engine-sc',
+      
     },
   }
 })
