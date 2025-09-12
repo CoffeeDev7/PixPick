@@ -2,7 +2,6 @@
 import { useNavigate } from 'react-router-dom';
 import homeicon from '../assets/home.png';
 import sharedicon from '../assets/people_10498917.png';
-import allboardsicon from '../assets/cover_16398103.png';
 import bellicon from '../assets/bell.png';
 import friendsicon from '../assets/add-friend.png'; // 👉 add a simple icon (or use any placeholder)
 
@@ -25,7 +24,6 @@ export default function Sidebar({
   const iconMap = {
     'My Boards': homeicon,
     'Shared with Me': sharedicon,
-    'All Boards': allboardsicon,
     Notifications: bellicon,
     Friends: friendsicon,
   };
