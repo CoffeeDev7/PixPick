@@ -18,7 +18,9 @@ PixPick is a minimal gallery-style app where you can paste or upload images, cre
 
 <img width="1898" height="782" alt="image" src="https://github.com/user-attachments/assets/2c3f47f4-999c-4c01-9f72-b734952686e2" />
 
-<img width="1882" height="811" alt="image" src="https://github.com/user-attachments/assets/a5fb18e8-0804-4dc1-98a6-656a9a2f4d84" />
+<img width="1889" height="859" alt="image" src="https://github.com/user-attachments/assets/80708112-642e-4259-8968-97295334ea82" />
+
+
 
 
 
