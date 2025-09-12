@@ -1,8 +1,14 @@
 import React, { useRef } from 'react';
+import { db } from '../firebase';
+import {
+  doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
+} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 
-const PasteBox = ({  }) => {
+const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) => {
   const pasteRef = useRef(null);
     const [dragActive, setDragActive] = React.useState(false);
+    const MAX_FIRESTORE_SIZE = 1 * 1024 * 1024; // 1MB
 
     // -------------------- image saving / paste handling (unchanged) --------------------
     const saveImageToFirestore = async (src) => {
@@ -362,12 +368,12 @@ const PasteBox = ({  }) => {
       style={{
         display: 'block',
         width: '100%',
-        height: dragActive ? '80px' : '40px', // default height
+        height: dragActive ? '120px' : '40px', // default height
         maxHeight: '200px', // maximum expanded height
         border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
         background: dragActive
           ? '#e3f2fd'
-          : 'linear-gradient(90deg,rgba(167, 201, 115, 1) 0%, rgba(6, 103, 112, 1) 55%, rgba(129, 227, 102, 1) 100%)',
+          : 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
         fontSize: '16px',
         marginBottom: '16px',
         padding: '10px',

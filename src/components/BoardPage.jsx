@@ -17,7 +17,6 @@ import CollaboratorsModal from './modals/CollaboratorsModal';
 import { supabase } from "../lib/supabase";
 import PasteBox from './PasteBox';
 
-const MAX_FIRESTORE_SIZE = 1 * 1024 * 1024; // 1MB
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
@@ -1097,7 +1096,7 @@ const handleDeleteBoard = async (boardIdParam) => {
       `}</style>
 
       {/* Text area for paste / drag-and-drop */}
-      <PasteBox />
+      <PasteBox boardId={boardId} boardTitle={boardTitle} user={user} showToast={showToast} setLastOpenedShort={setLastOpenedShort}/>
 
 
       {/* Images grid */}
