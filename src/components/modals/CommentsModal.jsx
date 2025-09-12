@@ -120,7 +120,7 @@ const CommentsModal = ({
                   height: 40,
                   borderRadius: 10,
                   border: "none",
-                  background: "rgba(255,255,255,0.12)",
+                  background: "#E23D28 ",
                   color: "#fff",
                   display: "inline-flex",
                   alignItems: "center",
