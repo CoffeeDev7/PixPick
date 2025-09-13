@@ -1,6 +1,94 @@
 import React from 'react';
 import commenticon from '../../assets/comment-add-svgrepo-com.svg';
 import rotateicon from '../../assets/rotate-cw-svgrepo-com.svg';
+import infoicon from '../../assets/info-svgrepo-com.svg';
+
+// Named component (no default)
+export const InfoModal = ({ open, onClose, image }) => {
+  if (!open) return null;
+
+  function formatSize(bytes) {
+  if (!bytes) return "Unknown";
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+}
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+      borderRadius: "16px",
+      padding: "20px",
+      width: "320px",
+      maxWidth: "90%",
+      boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+      maxHeight: "80vh", // Sets max height to 80% of the viewport height
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "16px",
+          padding: "20px",
+          width: "320px",
+          maxWidth: "90%",
+          boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+        }}
+      >
+        <h2 style={{ marginTop: 0, marginBottom: "12px", fontSize: "18px" }}>
+          Image Info
+        </h2>
+        <p>
+          <strong>Title:</strong> {image?.title || "Mock Title"}
+        </p>
+        <p>
+          <strong>Uploaded By:</strong> {image?.user || "John Doe"}
+        </p>
+        <p>
+          <strong>Date:</strong>{" "}
+          {image?.createdAt
+            ? image.createdAt.toDate
+              ? image.createdAt.toDate().toLocaleString()
+              : image.createdAt // fallback if already string
+            : "2025-09-13, 10:00 AM"}
+        </p>
+
+        <p>
+          <strong>Resolution:</strong> {image?.resolution || "1080x720"}
+        </p>
+        <p>
+          <strong>Size:</strong>{" "}
+          {image?.storage?.size
+            ? formatSize(image.storage.size)
+            : image?.size
+            ? formatSize(image.size)
+            : "Unknown"}
+        </p>
+
+
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: "16px",
+            padding: "8px 12px",
+            border: "none",
+            borderRadius: 999,
+            background:
+              "linear-gradient(90deg, rgba(27,153,159,0.95), rgba(43,95,168,0.95))",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const ImageModal = ({
   images,
@@ -12,6 +100,7 @@ const ImageModal = ({
   isMobile,
 }) => {
   if (modalIndex === null) return null;
+  const [infoOpen, setInfoOpen] = React.useState(false);
 
   // Touch handlers for swipe navigation
   const touchStartX = React.useRef(null);
@@ -299,6 +388,47 @@ const ImageModal = ({
           >
             <img width="18" height="18" src={rotateicon} alt="rotate" />
           </button>
+
+          <button
+            aria-label="Info image"
+            title="Info"
+            onClick={(e) => {
+              e.stopPropagation();
+              setInfoOpen(true);
+            }}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px 12px',
+              borderRadius: 999,
+              border: 'none',
+              background:
+                'linear-gradient(90deg, rgba(27,153,159,0.95), rgba(43,95,168,0.95))',
+              color: '#fff',
+              cursor: 'pointer',
+              transition: 'transform .12s ease, box-shadow .12s ease, background .12s ease',
+              outline: 'none',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <img width="18" height="18" src={infoicon} alt="info" />
+          </button>
+
+            {/* Info Modal */}
+          <InfoModal
+            open={infoOpen}
+            onClose={() => setInfoOpen(false)}
+            image={currentImage}
+          />
 
           <button
             aria-label="Image comments"
