@@ -186,7 +186,6 @@
 .my-textarea-input:not(:focus):not(:hover)::placeholder {
   /* When not focused AND not hovered, set opacity to 0 */
   opacity: 0;
-  background: linear-gradient(90deg,rgba(167, 201, 115, 1) 0%, rgba(6, 103, 112, 1) 55%, rgba(129, 227, 102, 1) 100%);
 }
 
 /* Floating back button (drop into your main CSS file) */

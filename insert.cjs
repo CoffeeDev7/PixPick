@@ -1,8 +1,9 @@
 // insert.cjs
 const admin = require("firebase-admin");
 const fs = require("fs");
+const fetch = require("node-fetch"); // add: npm install node-fetch
 
-const serviceAccount = JSON.parse(fs.readFileSync("./secret-account-key.json"));
+const serviceAccount = JSON.parse(fs.readFileSync("./security-key.json"));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -10,44 +11,52 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-async function migrateCollaborators() {
+async function backfillImageSizes() {
   const boardsSnap = await db.collection("boards").get();
 
   for (const boardDoc of boardsSnap.docs) {
-    const boardData = boardDoc.data();
-    const collabsSnap = await db
+    const boardId = boardDoc.id;
+    console.log(`🔍 Checking board: ${boardId}`);
+
+    const imagesSnap = await db
       .collection("boards")
-      .doc(boardDoc.id)
-      .collection("collaborators")
+      .doc(boardId)
+      .collection("images")
       .get();
 
-    for (const collabDoc of collabsSnap.docs) {
-      const collabData = collabDoc.data();
-      let updates = {};
+    for (const imageDoc of imagesSnap.docs) {
+  const data = imageDoc.data();
 
-      // add missing boardId
-      if (!("boardId" in collabData) || !collabData.boardId) {
-        updates.boardId = boardDoc.id;
-      }
+  if (data.storage?.size || data.size) continue; // skip Supabase + already updated
 
-      if (!collabData.createdAt) {
-        updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
-      }
-      if (!collabData.boardTitle) {
-        updates.boardTitle = boardData.title || "";
-      }
-      if (!collabData.ownerId) {
-        updates.ownerId = boardData.ownerId || "";
-      }
+  try {
+    let size;
 
-      if (Object.keys(updates).length) {
-        console.log(`Updating collab in board ${boardDoc.id}:`, updates);
-        await collabDoc.ref.update(updates);
-      }
+    if (data.src.startsWith("data:image")) {
+      // handle base64 data URI
+      const base64 = data.src.split(",")[1]; // strip header
+      const buffer = Buffer.from(base64, "base64");
+      size = buffer.byteLength;
+    } else {
+      // normal HTTP(S) URL
+      const res = await fetch(data.src);
+      const buffer = await res.arrayBuffer();
+      size = buffer.byteLength;
     }
-  }
 
-  console.log("Migration complete!");
+    await imageDoc.ref.update({ size });
+
+    console.log(
+      `✅ Updated ${boardId}/${imageDoc.id} with size=${(size / (1024 * 1024)).toFixed(2)} MB`
+    );
+  } catch (err) {
+    console.error(`❌ Failed to update ${boardId}/${imageDoc.id}`, err.message);
+  }
 }
 
-migrateCollaborators();
+  }
+
+  console.log("🎉 Backfill complete!");
+}
+
+backfillImageSizes();

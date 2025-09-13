@@ -1,145 +1,161 @@
-import React, { useRef } from 'react';
+// PasteBox.jsx
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { db } from '../firebase';
 import {
-  doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
+  doc, collection, addDoc, getDocs, updateDoc, serverTimestamp,
 } from 'firebase/firestore';
+import { FiPlus} from 'react-icons/fi';
+import { IoCloudOutline } from "react-icons/io5";
 import { supabase } from '../lib/supabase';
 
-const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) => {
+const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast, setLastOpenedShort }, ref) => {
   const pasteRef = useRef(null);
-    const [dragActive, setDragActive] = React.useState(false);
-    const MAX_FIRESTORE_SIZE = 1 * 1024 * 1024; // 1MB
+  const fileInputRef = useRef(null);
 
-    // -------------------- image saving / paste handling (unchanged) --------------------
-    const saveImageToFirestore = async (src) => {
-      const imageRef = collection(db, 'boards', boardId, 'images');
-  
-      showToast(
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/eat (1).png" alt="Uploading" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontWeight: 600 }}>Uploading image…</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>Hold on — uploading to your board</div>
-          </div>
-        </div>,
-        'info',
-        20000
-      );
-  
-      try {
-        const docRef = await addDoc(imageRef, {
-          src,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-          rating: null,
-        });
-  
-        // optimistic immediate UI: show "just now"
+  // UI state
+  const [overlayVisible, setOverlayVisible] = useState(false); // overlay + pastebox visible
+  const [dragCounter, setDragCounter] = useState(0); // robust drag enter/leave counting
+  const [dragActive, setDragActive] = useState(false);
+  const MAX_FIRESTORE_SIZE = 1 * 1024 * 1024; // 1MB
+
+  // plus button scroll fade
+  const [showFab, setShowFab] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 5) {
+        setShowFab(false); // fade out when scrolling down
+      } else {
+        setShowFab(true); // fade back in at top
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+
+  // -------------------- image saving / paste handling (unchanged logic) --------------------
+  const saveImageToFirestore = async (src) => {
+    const imageRef = collection(db, 'boards', boardId, 'images');
+
+    showToast(
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <img src="/eat (1).png" alt="Uploading" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontWeight: 600 }}>Uploading image…</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>Hold on — uploading to your board</div>
+        </div>
+      </div>,
+      'info',
+      20000
+    );
+
+    try {
+      const docRef = await addDoc(imageRef, {
+        src,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        rating: null,
+      });
+
       setLastOpenedShort('just now');
-  
-      // update the board doc so board.updatedAt / lastOpenedAt is fresh for others
+
       try {
         const boardRef = doc(db, 'boards', boardId);
         await updateDoc(boardRef, { updatedAt: serverTimestamp() });
       } catch (err) {
         console.warn('Could not update board.updatedAt', err);
       }
-  
-        showToast('Image uploaded', 'success', 3500);
-  
-        try {
-    const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
-    const uids = collabSnap.docs
-      .map(d => d.id)
-      .filter(uid => uid && uid !== user.uid); // exclude yourself
-  
-    if (uids.length > 0) { // only send if others exist
-      const payload = {
-        type: 'board_activity',
-        text: `${user.displayName || 'Someone'} added a pick to ${boardTitle || 'your board'}`,
-        createdAt: serverTimestamp(),
-        read: false,
-        boardId,
-        actor: user.uid,
-        url: `/board/${boardId}?image=${docRef.id}`,
-      };
-      await Promise.all(
-        uids.map(uid =>
-          addDoc(collection(db, 'users', uid, 'notifications'), payload)
-        )
-      );
-    }
-  } catch (err) {
-    console.warn('Could not create notifications for collaborators', err);
-  }
-  
-  
+
+      showToast('Image uploaded', 'success', 3500);
+
+      try {
+        const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
+        const uids = collabSnap.docs
+          .map(d => d.id)
+          .filter(uid => uid && uid !== user.uid);
+
+        if (uids.length > 0) {
+          const payload = {
+            type: 'board_activity',
+            text: `${user.displayName || 'Someone'} added a pick to ${boardTitle || 'your board'}`,
+            createdAt: serverTimestamp(),
+            read: false,
+            boardId,
+            actor: user.uid,
+            url: `/board/${boardId}?image=${docRef.id}`,
+          };
+          await Promise.all(
+            uids.map(uid =>
+              addDoc(collection(db, 'users', uid, 'notifications'), payload)
+            )
+          );
+        }
       } catch (err) {
-        console.error('Unexpected error saving image:', err);
-        showToast('Upload failed — try again', 'error', 5000);
+        console.warn('Could not create notifications for collaborators', err);
       }
-    };
-  
-    // helper: returns true for "likely image" urls (even if no file extension)
+    } catch (err) {
+      console.error('Unexpected error saving image:', err);
+      showToast('Upload failed — try again', 'error', 5000);
+    }
+  };
+
+  // helper: returns true for "likely image" urls (even if no file extension)
   function isLikelyImageUrl(url) {
     if (!url) return false;
     try {
       const u = new URL(url);
-      // common hosts Google uses for thumbnails / image hosting
       const proxyHosts = /(gstatic\.com|googleusercontent\.com|ggpht\.com|bp\.blogspot\.com|lh3\.googleusercontent\.com|cdn\.instagram\.com)/i;
       if (proxyHosts.test(u.hostname)) return true;
-  
-      // google image redirect param or thumbnail param
       if (/[?&](imgurl|imgrefurl|q|tbn|source)=/i.test(u.search)) return true;
-  
-      // fallback: extension check
       if (/\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i.test(u.pathname + u.search)) return true;
-    } catch (e) {
-      // not a valid URL
-    }
+    } catch (e) {}
     return false;
   }
-  
-  // Replace your handler with this
+
+  // PASTE handler (keeps your advanced URL logic)
   const handlePaste = async (event) => {
     let handled = false;
-  
-    // If image file(s) are present in clipboard items, handle them first
+
     if (event.clipboardData && event.clipboardData.items) {
       for (let item of event.clipboardData.items) {
         if (item.type && item.type.indexOf('image') === 0) {
           const file = item.getAsFile();
           console.log(`📋 Pasted file detected. Size: ${file.size} bytes`);
-  
-          if (file.size > 1 * 1024 * 1024) {
-            // >1MB → Supabase
+          if (file.size > MAX_FIRESTORE_SIZE) {
             console.log(`➡️ Using Supabase upload (file > 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
             await saveImageToSupabase(file);
           } else {
-            // <=1MB → Firestore inline (base64)
             const reader = new FileReader();
             reader.onload = async function (e) {
               console.log(`➡️ Using inline upload (file <= 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
               await saveImageToFirestore(e.target.result);
             };
             reader.readAsDataURL(file);
+            // wait for reader to finish is handled by onload above (async awaited)
+            // since we don't block here, mark handled and let the rest of function skip text processing
           }
           handled = true;
         }
       }
     }
-  
-  
-    // text fallback (URL or data URL)
-    const text = event.clipboardData.getData('text') || '';
-  
+
+    // If we already handled an image file from clipboard items, skip text/url processing
+    if (handled) {
+      try { event.preventDefault(); } catch (e) {}
+      if (event.target) event.target.value = '';
+      return;
+    }
+
+    const text = (event.clipboardData && event.clipboardData.getData('text')) || '';
     const isDataUrl = text.startsWith('data:image/');
     const isDirectImageLink = /^https?:\/\/.+\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(text);
     const isGoogleAppProxy = /images\.app\.goo\.gl/i.test(text);
     const isGoogleImgresRedirect = /google\.com\/imgres.*[?&]imgurl=/i.test(text);
     const isBrokenGoogleImageCopy = /google\.com\/url\?sa=i/i.test(text);
     const isLikelyImage = isLikelyImageUrl(text);
-  
+
     if (isGoogleAppProxy) {
       showToast("⚠️ Can't preview this Google image link. Open it in browser, then copy image directly.");
       handled = true;
@@ -153,32 +169,21 @@ const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) 
       await saveImageToFirestore(text);
       handled = true;
     } else if (isDirectImageLink) {
-      // direct link with extension — you were already handling this
       await saveImageToFirestore(text);
       handled = true;
     } else if (isLikelyImage) {
-      // NEW: treat gstatic / googleusercontent / tbn-style URLs as images
-      // Prefer server-side import (recommended) to avoid CORS & hotlink issues.
       try {
-        // Try an in-client quick validation using Image to see if it loads
         await new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = () => resolve();
           img.onerror = () => reject(new Error('image failed to load'));
           img.src = text;
-          // in some browsers this will still "load" even if CORS would block canvas ops; it's just a presence check
         });
-  
-        // At this point the URL loads — use a URL-import path (server proxy) to persist it.
-        // Implement saveImageUrlToFirestore(url) to either:
-        //  - call your server /import endpoint which fetches the remote image and uploads to Firebase Storage
-        //  - OR try client fetch->blob (may hit CORS)
         await saveImageToFirestore(text);
         handled = true;
       } catch (err) {
-        // image didn't load in the client — still attempt server-side import as a fallback
         try {
-          await saveImageToFirestore(text); // server should fetch it
+          await saveImageToFirestore(text);
           handled = true;
         } catch (err2) {
           console.warn('image import failed:', err2);
@@ -187,32 +192,28 @@ const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) 
         }
       }
     }
-  
+
     if (handled) {
-      event.preventDefault();         // stop default paste into textarea
+      event.preventDefault();
       if (event.target) event.target.value = '';
     }
   };
-  
-  
+
+  // DROP handler (files or dragged links)
   const handleDrop = async (event) => {
     event.preventDefault();
     let handled = false;
-  
-   // 1. Handle file drops (like dragging an image from desktop)
+
     if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
       for (let file of event.dataTransfer.files) {
         if (file.type && file.type.startsWith("image/")) {
-          console.log(`📥 Dropped file detected. Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
-  
           if (file.size > MAX_FIRESTORE_SIZE) {
-            console.log("➡️ Using Supabase upload (file > 1MB)");
+            console.log(`➡️ Using Supabase upload (file > 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
             await saveImageToSupabase(file);
           } else {
-            console.log("➡️ Using Firestore inline upload (file <= 1MB)");
-            // convert to dataURL and reuse your existing small-image flow
             const reader = new FileReader();
             reader.onload = async (e) => {
+              console.log(`➡️ Using inline upload (file <= 1MB) ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
               await saveImageToFirestore(e.target.result, file.size);
             };
             reader.readAsDataURL(file);
@@ -221,119 +222,87 @@ const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) 
         }
       }
     }
-  
-    // 2. Handle text/URLs (like dragging from another tab)
-    // NOTE: if we already handled files above, skip text to avoid duplicates
+
     if (!handled) {
       const text = event.dataTransfer.getData("text") || "";
       if (text) {
-        console.log("goign old way")
-        // Reuse the same logic you already wrote for paste:
         await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
         handled = true;
       }
     }
-  
-    // cleanup UI state & input value
+
     setDragActive(false);
-    try { if (event.dataTransfer) event.dataTransfer.clearData(); } catch (e) { /* ignore */ }
-  
+    setOverlayVisible(false);
+    try { if (event.dataTransfer) event.dataTransfer.clearData(); } catch (e) {}
+
     if (handled && event.target) {
       event.target.value = "";
     }
   };
-  
-  // -------------------- Supabase upload for large images --------------------
-  // requires setting up Supabase project + storage bucket + API keys
-  // see https://supabase.com/docs/guides/storage for details
-  // and
-  
-  
+
+  // Supabase upload for large images (kept as in your original)
   const saveImageToSupabase = async (file) => {
     const imageRef = collection(db, "boards", boardId, "images");
-  
+
     showToast("Dragging this chunky boy to the cloud ... 🐦‍🔥", "info", 20000);
-  
     try {
-      // sanitize filename
       function sanitizeFileName(name) {
-        return name.replace(/[^a-zA-Z0-9._-]/g, "_"); // safe chars only
+        return name.replace(/[^a-zA-Z0-9._-]/g, "_");
       }
-  
       const fileName = sanitizeFileName(file.name);
       const path = `boards/${boardId}/${Date.now()}-${fileName}`;
-  
-      // Upload to Supabase
+
       const { error: uploadError } = await supabase.storage
         .from("pixpick-images")
         .upload(path, file);
-  
-      if (uploadError) throw uploadError;
-  
-      // ⚡️ Generate signed URL (1 week validity for example)
+
+      if (uploadError){
+        showToast(`supabasing Upload failed: ${uploadError.message}`, "error", 8000);
+      }
       const { data: signedData, error: signedError } = await supabase.storage
         .from("pixpick-images")
-        .createSignedUrl(path, 60 * 60 * 24 * 7); // 7 days
-  
+        .createSignedUrl(path, 60 * 60 * 24 * 7);
+
       if (signedError) throw signedError;
-  
-      // Save Firestore doc with storage info (keep path so you can re-generate)
+
       const docRef = await addDoc(imageRef, {
-        src: signedData.signedUrl, // this is the temp view URL
+        src: signedData.signedUrl,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         rating: null,
         storage: {
           provider: "supabase",
-          path, // keep path for future signed URL refresh
+          path,
           size: file.size,
           contentType: file.type,
         },
       });
-  
-      console.log(
-        `✅ Uploaded to Supabase: ${(file.size / (1024 * 1024)).toFixed(2)} MB`
-      );
-  
-      // refresh board.updatedAt
+
       try {
-        const boardRef = doc(db, "boards", boardId);
+        const boardRef = doc(db, 'boards', boardId);
         await updateDoc(boardRef, { updatedAt: serverTimestamp() });
       } catch (err) {
         console.warn("Could not update board.updatedAt", err);
       }
-  
-      showToast(
-        `File uploaded (${(file.size / (1024 * 1024)).toFixed(2)} MB) ✅`,
-        "success",
-        3500
-      );
-  
-      // notifications
+
+      showToast(`File uploaded (${(file.size / (1024 * 1024)).toFixed(2)} MB) ✅`, "success", 3500);
+
       try {
-        const collabSnap = await getDocs(
-          collection(db, "boards", boardId, "collaborators")
-        );
-        const uids = collabSnap.docs
-          .map((d) => d.id)
-          .filter((uid) => uid && uid !== user.uid);
-  
+        const collabSnap = await getDocs(collection(db, 'boards', boardId, 'collaborators'));
+        const uids = collabSnap.docs.map((d) => d.id).filter((uid) => uid && uid !== user.uid);
+
         if (uids.length > 0) {
           const payload = {
             type: "board_activity",
-            text: `${
-              user.displayName || "Someone"
-            } added a pick to ${boardTitle || "your board"}`,
+            text: `${user.displayName || "Someone"} added a pick to ${boardTitle || "your board"}`,
             createdAt: serverTimestamp(),
             read: false,
             boardId,
             actor: user.uid,
-            url: `/board/${boardId}?image=${docRef.id}`,
+            url: `/board/${boardId}?image=${doc(id)}`,
           };
           await Promise.all(
-            uids.map((uid) =>
-              addDoc(collection(db, "users", uid, "notifications"), payload)
-            )
+            uids.map((uid) => addDoc(collection(db, 'users', uid, 'notifications'), payload))
           );
         }
       } catch (err) {
@@ -341,60 +310,289 @@ const PasteBox = ({ boardId, boardTitle, user, showToast, setLastOpenedShort }) 
       }
     } catch (err) {
       console.error("❌ Supabase upload failed:", err);
-      showToast("Upload failed — try again", "error", 5000);
+      // showToast("Upload failed — try again", "error", 5000);
     }
   };
-  
-  
-  const handleDragOver = (event) => {
-    event.preventDefault();
-    setDragActive(true);
+
+  // -------------------- Smart page-level drag handlers --------------------
+  useEffect(() => {
+    const onWindowDragEnter = (e) => {
+      e.preventDefault();
+      // increment counter
+      setDragCounter(c => c + 1);
+      setDragActive(true);
+      setOverlayVisible(true);
+    };
+
+    const onWindowDragOver = (e) => {
+      e.preventDefault();
+      setDragActive(true);
+      setOverlayVisible(true);
+    };
+
+    const onWindowDragLeave = (e) => {
+      e.preventDefault();
+      setDragCounter(c => {
+        const next = Math.max(0, c - 1);
+        if (next === 0) {
+          setDragActive(false);
+          setOverlayVisible(false);
+        }
+        return next;
+      });
+    };
+
+    const onWindowDrop = (e) => {
+      // let the specific drop handler manage it via overlay drop
+      e.preventDefault();
+      setDragCounter(0);
+      setDragActive(false);
+      setOverlayVisible(false);
+    };
+
+    window.addEventListener('dragenter', onWindowDragEnter);
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('dragleave', onWindowDragLeave);
+    window.addEventListener('drop', onWindowDrop);
+
+    // allow paste while overlayVisible (catch global paste)
+    const onWindowPaste = (e) => {
+      // if overlay open, only call handlePaste for events NOT coming from our textarea
+      if (!overlayVisible) return;
+      if (pasteRef.current && (pasteRef.current === e.target || pasteRef.current.contains(e.target))) {
+        // textarea will handle this paste — avoid duplication
+        return;
+      }
+      handlePaste(e);
+    };
+    window.addEventListener('paste', onWindowPaste);
+
+    // keyboard escape to hide overlay
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOverlayVisible(false);
+        setDragActive(false);
+        setDragCounter(0);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.removeEventListener('dragenter', onWindowDragEnter);
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('dragleave', onWindowDragLeave);
+      window.removeEventListener('drop', onWindowDrop);
+      window.removeEventListener('paste', onWindowPaste);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [overlayVisible]); // overlayVisible in deps so paste binding respects current state
+
+  // click file picker
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
   };
-  
-  const handleDragLeave = (event) => {
-    // classic case: when leaving the drop area reset the visual flag
-    setDragActive(false);
+
+  // handle file selection via file input
+  const handleFileInputChange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (f.size > MAX_FIRESTORE_SIZE) {
+      await saveImageToSupabase(f);
+    } else {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        await saveImageToFirestore(ev.target.result);
+      };
+      reader.readAsDataURL(f);
+    }
+    // hide overlay after selection
+    setOverlayVisible(false);
+    e.target.value = '';
   };
+
+  // simple helper to show pastebox (for + Add)
+  const revealPastebox = () => {
+    setOverlayVisible(true);
+    // focus after next tick
+    //setTimeout(() => pasteRef.current?.focus?.(), 80);
+  };
+
+  // expose methods to parent (openFilePicker & revealPastebox)
+  useImperativeHandle(ref, () => ({
+    openFilePicker,
+    revealPastebox,
+  }), [openFilePicker, revealPastebox]);
+
+  // -------------------- Render --------------------
   return (
-    <textarea
-      ref={pasteRef}
-      className="my-textarea-input"
-      placeholder="Paste or Drag images/links here..."
-      onPaste={handlePaste}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      rows={4}
-      style={{
-        display: 'block',
-        width: '100%',
-        height: dragActive ? '120px' : '40px', // default height
-        maxHeight: '200px', // maximum expanded height
-        border: dragActive ? '2px solid #2196f3' : '2px dashed #4caf50',
-        background: dragActive
-          ? '#e3f2fd'
-          : 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
-        fontSize: '16px',
-        marginBottom: '16px',
-        padding: '10px',
-        borderRadius: '10px',
-        boxSizing: 'border-box',
-        transition: 'height 0.3s ease, box-shadow 0.3s ease',
-        outline: 'none',
-        overflow: 'hidden',
-        resize: 'none',
-        animation: dragActive ? 'pulseBorder 0.7s infinite' : 'none',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.height = '45px';
-        e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.height = '40px';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
-    />
+    <>
+      {/* Visible trigger for discoverability */}
+      <div style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 1000, // stays above other content
+            transition: 'opacity 0.4s ease',
+            opacity: modalIndex!=null ? 0 : (showFab ? 1 : 0), // hide when modal open
+            pointerEvents: showFab ? 'auto' : 'none', // avoid blocking clicks when hidden
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.7)}>
+        <button
+          onClick={revealPastebox}
+          aria-label="Add Pick"
+          style={{
+            background: 'rgba(0,0,0,0.35)',
+            color: '#fff',
+            border: 'none',
+            width: '60px', // Set a fixed width
+            height: '60px', // Set a fixed height
+            borderRadius: '50%', // Make it circular
+            cursor: 'pointer',
+            boxShadow: '0 6px 15px rgba(0,0,0,0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center', // Center the icon
+            backgroundColor: '#2e494a',
+            border: '1px solid #4a6f70',
+            outline: 'none',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease', // Add transition for smooth hover effects
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          <FiPlus size={32} />
+          
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileInputChange}
+        />
+      </div>
+
+      {/* Overlay + Pastebox (appears on drag or when user clicks + Add) */}
+      {overlayVisible && (
+        <div
+          onClick={() => {
+            setOverlayVisible(false);
+            setDragActive(false);
+            setDragCounter(0);
+          }}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+          onDrop={handleDrop}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: dragActive ? 'rgba(12,18,28,0.55)' : 'rgba(12,18,28,0.4)',
+            transition: 'background 0.18s ease',
+          }}
+        >
+          <div
+            style={{
+              width: Math.min(820, window.innerWidth - 48),
+              maxWidth: 'calc(100% - 48px)',
+              borderRadius: 12,
+              padding: 18,
+              background: '#0f1720',
+              boxShadow: '0 12px 40px rgba(2,6,23,0.6)',
+              color: '#e6eef8',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              alignItems: 'stretch'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>
+                {dragActive ? 'Drop your image to add it' : 'Paste Box'}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {/* <button
+                  onClick={() => { setOverlayVisible(false); setDragActive(false); setDragCounter(0); }}
+                  style={{
+                    background: 'transparent',
+                    color: '#b9c6d6',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button> */}
+                <button
+                  onClick={openFilePicker}
+                  style={{
+                    background: '#1f6feb',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 12px rgba(31,111,235,0.3)',
+                  }}
+                >
+                  <IoCloudOutline size={20} style={{ marginRight: 6, position: 'relative', top: -1 }} />
+                  Choose file
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              ref={pasteRef}
+              className="my-textarea-input"
+              placeholder="Paste anything..."
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+              rows={4}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: dragActive ? '150px' : '60px',
+                maxHeight: '220px',
+                border: dragActive ? '2px solid rgba(100, 149, 237, 0.95)' : '2px dashed rgba(255,255,255,0.06)',
+                background: 'linear-gradient(90deg,#111827,#0b1220)',
+                fontSize: '15px',
+                marginBottom: '0',
+                padding: '12px',
+                borderRadius: '10px',
+                boxSizing: 'border-box',
+                transition: 'height 0.25s ease, border 0.12s ease',
+                color: '#e6eef8',
+                outline: 'none',
+                resize: 'none'
+              }}
+            />
+
+            <div style={{ fontSize: 13, color: '#9fb0c9' }}>
+              Tip: You can also drop images directly anywhere on this page, even without this box.
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
-};
+});
 
 export default PasteBox;

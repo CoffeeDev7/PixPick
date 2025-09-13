@@ -1096,7 +1096,7 @@ const handleDeleteBoard = async (boardIdParam) => {
       `}</style>
 
       {/* Text area for paste / drag-and-drop */}
-      <PasteBox boardId={boardId} boardTitle={boardTitle} user={user} showToast={showToast} setLastOpenedShort={setLastOpenedShort}/>
+      <PasteBox modalIndex={modalIndex} boardId={boardId} boardTitle={boardTitle} user={user} showToast={showToast} setLastOpenedShort={setLastOpenedShort}/>
 
 
       {/* Images grid */}
