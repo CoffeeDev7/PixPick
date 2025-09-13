@@ -734,42 +734,60 @@ const handleDeleteImage = async (imageId, index) => {
   if (!confirmDelete) {
     return;
   }
+
   setModalIndex(null); // close modal if open
 
   try {
-    // First get the Firestore doc
+    // 1. Get Firestore doc
     const imageDocRef = doc(db, "boards", boardId, "images", imageId);
+    //console.log("[Delete] Fetching Firestore doc:", imageDocRef.path);
+
     const imageDocSnap = await getDoc(imageDocRef);
+    if (!imageDocSnap.exists()) {
+      console.warn("[Delete] Firestore doc does not exist for:", imageId);
+    } else {
+      console.log("[Delete] Firestore doc data:", imageDocSnap.data());
+    }
 
     if (imageDocSnap.exists()) {
-      const { src } = imageDocSnap.data();
+      const { src, storage } = imageDocSnap.data();
+      //console.log("[Delete] Image src from Firestore:", src);
+      //console.log("[Delete] Storage object from Firestore:", storage);
 
-      if (src) {
-        // Extract Supabase storage path from public URL
-        const urlPrefix = import.meta.env.VITE_SUPABASE_URLPREFIX;
-        const storagePath = src.replace(urlPrefix, ""); // e.g. boards/.../filename.png
+      if (storage?.path) {
+        // 2. Derive Supabase storage path
+        const storagePath = storage.path;
+        //console.log("[Delete] Derived storage path:", storagePath);
 
-        // Delete from Supabase
+        // 3. Try Supabase delete
         const { data, error: supabaseError } = await supabase.storage
           .from("pixpick-images")
           .remove([storagePath]);
 
+        //console.log("[Delete] Supabase response:", { data, supabaseError });
+
         if (supabaseError) {
-          console.error("Supabase deletion error:", supabaseError);
+          console.error("[Delete] Supabase deletion error:", supabaseError);
           showToast("Could not delete from storage", "error", 3000);
-          return; // don't delete from Firestore if storage delete fails
+          return; // bail out before Firestore delete
         }
+      } else {
+        console.warn("[Delete] No src field found in Firestore doc");
       }
     }
 
-    // Delete Firestore doc
+    // 4. Delete Firestore doc
+    //console.log("[Delete] Deleting Firestore doc:", imageDocRef.path);
     await deleteDoc(imageDocRef);
+
+    console.log("[Delete] Successfully deleted Firestore doc:", imageId);
     showToast("Pick deleted", "success", 2500);
   } catch (err) {
-    console.error("delete image error", err);
+    console.error("[Delete] Unexpected error:", err);
     showToast("Could not delete pick", "error", 3000);
   }
 };
+
 
 
   // -------------------- Share board logic --------------------

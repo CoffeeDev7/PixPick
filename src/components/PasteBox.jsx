@@ -434,10 +434,10 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
             zIndex: 1000, // stays above other content
             transition: 'opacity 0.4s ease',
             opacity: modalIndex!=null ? 0 : (showFab ? 1 : 0), // hide when modal open
-            pointerEvents: showFab ? 'auto' : 'none', // avoid blocking clicks when hidden
+            pointerEvents: modalIndex != null || !showFab ? 'none' : 'auto', // avoid blocking clicks when hidden
           }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.7)}>
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
         <button
           onClick={revealPastebox}
           aria-label="Add Pick"
