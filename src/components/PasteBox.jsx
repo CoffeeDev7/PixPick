@@ -1,5 +1,5 @@
 // PasteBox.jsx
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { db } from '../firebase';
 import {
   doc, collection, addDoc, getDocs, updateDoc, serverTimestamp,
@@ -36,7 +36,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
 
 
   // -------------------- image saving / paste handling (unchanged logic) --------------------
-  const saveImageToFirestore = async (src) => {
+  const saveImageToFirestore = async (src, size) => {
     const imageRef = collection(db, 'boards', boardId, 'images');
 
     showToast(
@@ -57,6 +57,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         rating: null,
+        size: size || null,
       });
 
       setLastOpenedShort('just now');
@@ -449,7 +450,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
             height: '60px', // Set a fixed height
             borderRadius: '50%', // Make it circular
             cursor: 'pointer',
-            boxShadow: '0 6px 15px rgba(0,0,0,0.12)',
+            boxShadow: '0 6px 15px rgba(0,0,0,0.42)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center', // Center the icon
@@ -460,11 +461,11 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.6)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.42)';
           }}
         >
           <FiPlus size={32} />
