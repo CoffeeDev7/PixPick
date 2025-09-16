@@ -213,6 +213,16 @@ const ImageModal = ({
   const rotationDeg = rotationIdx * 90;
   const rotateImage = () => setRotationIdx((r) => r + 1);
 
+    const prevImage = (e) => {
+    if (e) e.stopPropagation();
+    setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const nextImage = (e) => {
+    if (e) e.stopPropagation();
+    setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
   // toggle triggered by the overflow button (⋯)
   const toggleOverflow = (e) => {
     e.stopPropagation();
@@ -241,6 +251,24 @@ const ImageModal = ({
     transition: 'opacity 180ms ease',
     pointerEvents: showToolbar ? 'auto' : 'none',
   };
+
+    React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (modalIndex === null) return;
+
+      if (e.key === 'ArrowLeft') {
+        setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+      } else if (e.key === 'Escape') {
+        setModalIndex(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalIndex, images.length]);
+
 
   return (
     <div
@@ -509,6 +537,75 @@ const ImageModal = ({
           </button>
         </div>
       </div>
+
+      {/* Arrow Buttons */}
+        {/* Left arrow */}
+        <button
+          aria-label="Previous image"
+          onClick={(e) => prevImage(e)}
+          onTouchStart={(e) => { e.stopPropagation(); prevImage(); }}
+          style={{
+            position: 'absolute',
+            left: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 1200,
+            width: isDesktop ? 48 : 44,
+            height: isDesktop ? 64 : 56,
+            borderRadius: 12,
+            border: 'none',
+            background: 'rgba(0,0,0,0.02)',
+            opacity: 0.6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'opacity 150ms ease, transform 120ms ease',
+            pointerEvents: 'auto',
+            outline: 'none',
+            backdropFilter: 'blur(4px)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.transform = 'translateY(-50%) translateX(-4px)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.4; e.currentTarget.style.transform = 'translateY(-50%)'; }}
+        >
+          <svg width="18" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        {/* Right arrow */}
+        <button
+          aria-label="Next image"
+          onClick={(e) => nextImage(e)}
+          onTouchStart={(e) => { e.stopPropagation(); nextImage(); }}
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 1200,
+            width: isDesktop ? 48 : 44,
+            height: isDesktop ? 64 : 56,
+            borderRadius: 12,
+            border: 'none',
+            background: 'rgba(0,0,0,0.02)',
+            opacity: 0.6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'opacity 150ms ease, transform 120ms ease',
+            pointerEvents: 'auto',
+            outline: 'none',
+            backdropFilter: 'blur(4px)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.transform = 'translateY(-50%) translateX(-4px)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.4; e.currentTarget.style.transform = 'translateY(-50%)'; }}
+        >
+          <svg width="18" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
     </div>
   );
 };
