@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase";
@@ -6,9 +6,31 @@ import { db } from "../firebase";
 export default function BoardList({ user, boardsCache, setBoardsCache, selected }) {
   const [boards, setBoards] = useState([]);
   const [latestboardimages, setLatestBoardImages] = useState({});
-  const [viewMode, setViewMode] = useState("wide");
+  const [loading, setLoading] = useState(true);
 
-  // ---------- existing listeners (unchanged) ----------
+  // Responsive window hook
+  function useWindowSize() {
+    const [size, setSize] = useState({
+      width: typeof window !== "undefined" ? window.innerWidth : 1200,
+      height: typeof window !== "undefined" ? window.innerHeight : 800,
+    });
+    useEffect(() => {
+      const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
+    return size;
+  }
+  const { width } = useWindowSize();
+
+  const columns = useMemo(() => {
+    if (width < 640) return 1;
+    if (width < 900) return 2;
+    if (width < 1200) return 3;
+    return 4;
+  }, [width]);
+
+  // Data fetching logic from the original file
   useEffect(() => {
     if (!user || boardsCache.length > 0) return;
     const unsub = onSnapshot(collection(db, "boards"), (snap) => {
@@ -46,11 +68,13 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
 
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
     let boardUnsub = null;
     const collabUnsubs = new Map();
 
     const startListening = () => {
       boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
+        setLoading(false);
         const tempBoards = [];
         boardsSnap.forEach((boardDoc) => {
           const boardData = { id: boardDoc.id, ...boardDoc.data() };
@@ -117,184 +141,211 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
     };
   }, [user, selected]);
 
-  // ---------- styles you already had ----------
-  const boardItemStyle = {
-    background:
-      "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
-    borderRadius: "var(--card-radius)",
-    overflow: "hidden",
-    boxShadow: "0 6px 18px rgba(12,12,16,0.05)",
-    cursor: "pointer",
-    position: "relative",
-  };
+  // Utility: human-friendly time
+  function timeAgoShort(ts) {
+    if (!ts) return "";
+    let ms = 0;
+    if (ts.toDate) ms = ts.toDate().getTime();
+    else if (ts.seconds) ms = ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+    else if (typeof ts === "number") ms = ts;
+    else if (ts instanceof Date) ms = ts.getTime();
+    else return "";
 
-  const styles = {
-    mainImage: {
-      borderRadius: "10px",
-      overflow: "hidden",
-      background: "#ddd",
-    },
-    mainImageImg: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-      objectPosition: "top center",
-    },
-  };
-
-  // ---------- Responsive grid logic ----------
-  // decide columns based on window width
-  function useWindowSize() {
-    const [size, setSize] = useState({
-      width: typeof window !== "undefined" ? window.innerWidth : 1200,
-      height: typeof window !== "undefined" ? window.innerHeight : 800,
-    });
-    useEffect(() => {
-      const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
-      window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
-    }, []);
-    return size;
+    const diff = Date.now() - ms;
+    const mins = Math.round(diff / (1000 * 60));
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.round(hours / 24);
+    return `${days}d`;
   }
 
-  const { width } = useWindowSize();
+  const placeholder = "https://picsum.photos/seed/pixpick/800/450";
 
-  // breakpoints — tweak these if you like
-  const getColumns = () => {
-    if (width < 640) return 1; // mobile
-    if (width < 900) return 2; // small tablet
-    if (width < 1200) return 3; // laptop
-    return 4; // large desktop
-  };
+  function BoardCard({ board, imgs = [] }) {
+    const initialImgs = useMemo(() => {
+      return [
+        imgs[0] || placeholder,
+        imgs[1] || placeholder,
+        imgs[2] || placeholder,
+      ];
+    }, [imgs]);
 
-  const columns = getColumns();
+    const [cardImgs, setCardImgs] = useState(initialImgs);
 
-  const gridStyle = {
-    display: "grid",
-    gridTemplateColumns: `repeat(${columns}, 1fr)`,
-    gap: 12,
-    alignItems: "start",
-    background: "linear-gradient(to right top, #408083, #408083, #408083, #408083, #408083)",
-    padding: 12,
-    borderRadius: 12,
-  };
+    useEffect(() => {
+      setCardImgs(initialImgs);
+    }, [initialImgs]);
 
-  // ---------- Card sizing that scales inside each grid cell ----------
-  // We switched main/preview to percentage widths so they scale inside each grid cell.
-  const SIZES = {
-    // tweak these percentages to change visual proportions inside card
-    mainPercent: 0.62, // main image gets ~62% of the card width
-    previewPercent: 0.38,
-    mainHeight: 180, // px height for the visual. Change to suit your design.
-    gap: 8,
-  };
-
-  const coverStyles = {
-    wrapper: { display: "flex", gap: SIZES.gap, alignItems: "stretch", marginTop: 10 },
-    mainWrap: {
-      width: `${Math.round(SIZES.mainPercent * 100)}%`,
-      height: SIZES.mainHeight,
-      borderRadius: 6,
-      overflow: "hidden",
-      background: "#eaeaea",
-      flexShrink: 0,
-    },
-    mainImg: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-      display: "block",
-    },
-    previewColumn: {
-      width: `${Math.round(SIZES.previewPercent * 100)}%`,
-      display: "flex",
-      flexDirection: "column",
-      gap: Math.max(4, Math.round(SIZES.gap / 2)),
-      alignItems: "stretch",
-    },
-    previewImg: {
-      width: "100%",
-      height: `calc(${SIZES.mainHeight / 2}px - ${Math.round(SIZES.gap / 2)}px)`,
-      borderRadius: 6,
-      overflow: "hidden",
-      background: "#eee",
-      objectFit: "cover",
-      display: "block",
-      cursor: "pointer",
-    },
-  };
-
-  const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
-
-  // BoardCard identical to before but adapted to percent widths (so it scales in grid)
-  function BoardCard({ board, imgs }) {
-    const initial = [imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder];
-    const [cardImgs, setCardImgs] = useState(initial);
-
-    const onPreviewClick = (previewIndex) => {
+    const onPreviewClick = (e, previewIndex) => {
+      e.preventDefault();
       const newImgs = [...cardImgs];
       [newImgs[0], newImgs[previewIndex]] = [newImgs[previewIndex], newImgs[0]];
       setCardImgs(newImgs);
     };
 
     return (
-      <div style={coverStyles.wrapper}>
-        <div style={coverStyles.mainWrap}>
-          <img alt={`board-main-${board.id}`} src={cardImgs[0]} style={{ ...coverStyles.mainImg, ...styles.mainImageImg }} />
+      <div
+        role="article"
+        aria-label={`Board ${board.title || "Untitled"}`}
+        className="bp-card"
+        style={{
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "linear-gradient(180deg,#f6f8f9,#eef4f5)",
+          boxShadow: "0 8px 20px rgba(11,22,28,0.08)",
+          display: "grid",
+          gridTemplateColumns: "1fr 120px",
+          gap: 10,
+        }}
+      >
+        <div style={{ position: "relative", minHeight: 140 }}>
+          <img
+            src={cardImgs[0]}
+            alt={board.title || "Board cover"}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+            loading="lazy"
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 8,
+              bottom: 8,
+              right: 8,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div style={{ color: "#fff", textShadow: "0 4px 12px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{board.title || "Untitled Board"}</div>
+              <div style={{ fontSize: 12, opacity: 0.95 }}>
+                {board.ownerDisplayName ? board.ownerDisplayName : (board.ownerId ? board.ownerId.slice(0, 6) : "owner")} ·{" "}
+                {timeAgoShort(board.updatedAt || board.createdAt)}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ fontSize: 13, background: "rgba(255,255,255,0.12)", padding: "6px 8px", borderRadius: 8, color: "#fff", fontWeight: 700 }}>
+                {board.numImages ?? "—"} picks
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div style={coverStyles.previewColumn}>
-          {[1, 2].map((i) => (
-            <img
-              key={i}
-              alt={`preview-${i}`}
-              src={cardImgs[i]}
-              onClick={() => onPreviewClick(i)}
-              style={coverStyles.previewImg}
-            />
-          ))}
+        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexDirection: "column", alignItems: "stretch" }}>
+            {[1, 2].map((i) => (
+              <img
+                key={i}
+                src={cardImgs[i]}
+                alt={`preview ${i}`}
+                style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8, cursor: "pointer" }}
+                loading="lazy"
+                onClick={(e) => onPreviewClick(e, i)}
+              />
+            ))}
+          </div>
+
+          <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {(board.collaborators || []).slice(0, 3).map((c, idx) => {
+                const photo = c.photoURL || "https://picsum.photos/seed/pixpick/800/450";
+                return (
+                  <div
+                    key={idx}
+                    title={c.displayName || c.id}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      border: "2px solid #fff",
+                      transform: `translateX(-${idx * 10}px)`,
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                      background: "#ddd",
+                    }}
+                  >
+                    {photo ? <img src={photo} alt={c.displayName || "user"} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{(c.displayName || "U").slice(0, 1)}</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#334", opacity: 0.9 }}>{board.collaborators?.length ?? 0} collaborators</div>
+              <div style={{ fontSize: 12, color: "#334", opacity: 0.9 }}>{board.numImages ?? "—"} images</div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ---------- Render ----------
-  return (
-    <div>
-      {boards.length === 0 ? <h4 style={{ textAlign: "center" }}>No boards found</h4> : null}
-
-      {/* Grid container: responsive columns */}
-      <div style={gridStyle}>
-        {boards.map((board) => {
-          const imgs = latestboardimages[board.id] || [];
-          const to = `/board/${board.id}`;
-          return (
-            <Link
-              key={board.id}
-              to={to}
-              style={{
-                ...boardItemStyle,
-                display: "block",
-                padding: 12,
-                borderRadius: 10,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                textDecoration: "none",
-                color: "inherit",
-                overflow: "hidden",
-                marginBottom: 0, // grid manages spacing
-                minHeight: SIZES.mainHeight + 40,
-              }}
-            >
-              <strong>{board.title || "Untitled Board"}</strong>
-
-              {/* card cover (main-left, previews-right) */}
-              <div style={{ marginTop: 8 }}>
-                <BoardCard board={board} imgs={imgs} />
-              </div>
-            </Link>
-          );
-        })}
+  // Skeleton card component
+  function SkeletonCard() {
+    return (
+      <div style={{ borderRadius: 12, padding: 12, background: "linear-gradient(180deg,#f4f6f7,#eef1f3)" }}>
+        <div style={{ height: 120, borderRadius: 8, background: "#e6e9ea", marginBottom: 8 }} />
+        <div style={{ height: 16, width: "60%", background: "#e6e9ea", borderRadius: 6 }} />
       </div>
+    );
+  }
+
+  // Render logic
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>{selected} <span style={{ color: "#6b7280", fontSize: 14, marginLeft: 8 }}>({boards.length})</span></h3>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="bp-btn" onClick={() => { /* optional view change */ }} aria-label="grid view">Grid</button>
+          <button className="bp-btn" onClick={() => { /* optional view change */ }} aria-label="list view">List</button>
+        </div>
+      </div>
+
+      {loading && boards.length === 0 ? (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(columns, 3)}, 1fr)`, gap: 12 }}>
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : boards.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+          No boards found — create a board to get started.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 12 }}>
+          {boards.map((board) => {
+            const imgs = latestboardimages[board.id] || [];
+            const numImages = board.numImages ?? (board.estimatedImageCount ?? imgs.length);
+            const boardWithStat = { ...board, numImages, collaborators: board.collaboratorsArray || [] };
+
+            return (
+              <Link
+                to={`/board/${board.id}`}
+                key={board.id}
+                style={{ textDecoration: "none", color: "inherit" }}
+                aria-label={`Open board ${board.title || "Untitled"}`}
+              >
+                <BoardCard board={{ ...boardWithStat }} imgs={imgs} />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* minimal styles for hover/button */}
+      <style>{`
+        .bp-card { transition: transform .18s ease, box-shadow .18s ease; cursor: pointer; }
+        .bp-card:hover { transform: translateY(-6px); box-shadow: 0 18px 38px rgba(11,22,28,0.14); }
+        .bp-btn { background: transparent; border: 1px solid rgba(0,0,0,0.06); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+        .bp-btn:hover { background: rgba(0,0,0,0.03); }
+      `}</style>
     </div>
   );
 }
