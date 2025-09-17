@@ -201,7 +201,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
           borderRadius: 12,
           overflow: "hidden",
           background: "linear-gradient(180deg,#f6f8f9,#eef4f5)",
-          boxShadow: "0 8px 20px rgba(11,22,28,0.08)",
+          boxShadow: "0 8px 20px rgba(11,22,28,0.8)",
           display: "grid",
           gridTemplateColumns: "1fr 80px",// 2nd arg must atleast be 0px to be aesthetic. dont remove 2nd arg.
           gap: 0,
@@ -236,19 +236,19 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
           >
             {/* board name,ownerid, date */}
             <div style={{ color: "#fff", textShadow: "0 4px 12px rgba(0,0,0,0.5)" ,whiteSpace: "nowrap"}}>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{board.title || "Untitled Board"}</div>
-              <div style={{ fontSize: 12, opacity: 0.95 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, opacity: 0.7 }}>{board.title || "Untitled Board"}</div>
+              <div style={{ fontSize: 12, opacity: 0.45 }}>
                 {board.ownerDisplayName ? board.ownerDisplayName : (board.ownerId ? board.ownerId.slice(0, 6) : "owner")} ·{" "}
                 {timeAgoShort(board.updatedAt || board.createdAt)}
               </div>
             </div>
 
             {/*3 picks */}
-            <div style={{ display: "flex", gap: 6, alignItems: "center" ,flexShrink: 0}}>
+            {/* <div style={{ display: "flex", gap: 6, alignItems: "center" ,flexShrink: 0}}>
               <div style={{ fontSize: 13, background: "rgba(255,255,255,0.12)", padding: "6px 8px", borderRadius: 8, color: "#fff", fontWeight: 700 }}>
                 {board.numImages ?? "—"} picks
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
