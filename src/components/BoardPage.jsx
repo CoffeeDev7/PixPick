@@ -15,25 +15,34 @@ import Toast from './Toast';
 import CollaboratorsModal from './modals/CollaboratorsModal';
 import { supabase } from "../lib/supabase";
 import PasteBox from './PasteBox';
+import {
+  useBoardAndCollaborators,
+  useCollaboratorProfiles,
+  useImagesSubscription,
+  useCommentCounts,
+  useBoardCommentsCount,
+  useDeepLinkImageOpen,
+  useModalKeyboardNavigation,
+  useEscapeToExit,
+  useMountLogger,
+  useOutsideClick,
+  useFetchBoardTitle,
+} from '../hooks/BoardPage.hooks';
+
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const menuRef = useRef(null);
+  
   // Reorder state (jiggle + drag)
 const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
 
-  const [images, setImages] = useState([]);
-  const [boardTitle, setBoardTitle] = useState('');
+  //const [images, setImages] = useState([]);
+  // const [boardTitle, setBoardTitle] = useState('');
   const [toast, setToast] = useState(null); // { msg, type, duration }
   const [modalIndex, setModalIndex] = useState(null);
-
-  const [collaborators, setCollaborators] = useState([]);
-  const [collaboratorUIDs, setCollaboratorUIDs] = useState([]);
-  const [collaboratorProfiles, setcollaboratorProfiles] = useState([]);
-
-  const [imagesLoading, setImagesLoading] = useState(true);
-
   // Board menu (3-dots)
   const [showBoardMenu, setShowBoardMenu] = useState(false);
 
@@ -46,12 +55,14 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const [commentText, setCommentText] = useState('');
   const commentsUnsubRef = useRef(null);
 
+  const [settingsmodal, setSettingsmodal] = useState(false);
+
   // board-level comments (small button beside 3-dots)
   const [boardCommentModalOpen, setBoardCommentModalOpen] = useState(false);
   const [boardCommentList, setBoardCommentList] = useState([]);
   const [boardCommentText, setBoardCommentText] = useState('');
   const boardCommentsUnsubRef = useRef(null);
-  const [boardCommentsCount, setBoardCommentsCount] = useState(0);
+  //const [boardCommentsCount, setBoardCommentsCount] = useState(0);
 
   // Collaborators modal
   const [isCollaboratorsModalOpen, setIsCollaboratorsModalOpen] = useState(false);
@@ -60,11 +71,8 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const closeCollaboratorsModal = () => setIsCollaboratorsModalOpen(false);
 
   // per-image comment counts map { imageId: number }
-  const [commentCounts, setCommentCounts] = useState({});
+  //const [commentCounts, setCommentCounts] = useState({});
   const commentCountsUnsubsRef = useRef(new Map());
-
-  // short "last opened" string
-  const [lastOpenedShort, setLastOpenedShort] = useState('');
 
   // whether to notify collaborators when posting an image comment
   const [notifyFriends, setNotifyFriends] = useState(false);
@@ -72,378 +80,38 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   // separate flag for board-level comments
   const [boardNotifyFriends, setBoardNotifyFriends] = useState(false);
 
+
+  // -------------------- useEffects --------------------
+  // Complex useeffects  into HOOOKS --------------------
+  const { images, imagesLoading } = useImagesSubscription(boardId);
+  const commentCounts = useCommentCounts(boardId, images);
+  const boardCommentsCount = useBoardCommentsCount(boardId);
+  useDeepLinkImageOpen(location.search, images, setModalIndex);
+  useModalKeyboardNavigation(modalIndex, images.length, setModalIndex);
+  useEscapeToExit(reorderMode, () => { setReorderMode(false); showToast('Reorder mode exited','info',1200); });
+  useMountLogger('BoardPage');
+  useOutsideClick(menuRef, () => setShowBoardMenu(false), showBoardMenu);
+  const { boardTitle, lastOpenedShort, setLastOpenedShort } = useFetchBoardTitle(boardId);
+  const { setBoardTitle, collaborators, timeAgoShort, getProfileCached,  collaboratorUIDs} = useBoardAndCollaborators(boardId)
+  const collaboratorProfiles = useCollaboratorProfiles(collaboratorUIDs);
+
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
     setToast({ msg, type, duration });
     setTimeout(() => setToast(null), duration);
   };
 
-  // -------------------- small helpers --------------------
-  function timeAgoShort(ts) {
-    if (!ts) return '';
-    let ms = 0;
-    if (ts.toDate) ms = ts.toDate().getTime();
-    else if (ts.seconds) ms = ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
-    else if (typeof ts === 'number') ms = ts;
-    else if (ts instanceof Date) ms = ts.getTime();
-    else return '';
-
-    const diff = Date.now() - ms;
-    const mins = Math.round(diff / (1000 * 60));
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.round(mins / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.round(hours / 24);
-    return `${days}d`;
-  }
-
-  async function getProfileCached(uid) {
-  try {
-    if (!uid) return { displayName: 'Unknown', photoURL: '' };
-    const TTL = 1000 * 60 * 60 * 24; // 24h
-    const now = Date.now();
-    const key = `profile_${uid}`;
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed._cachedAt && now - parsed._cachedAt < TTL) {
-        // use cached only if it has at least a displayName or a non-empty photoURL
-        if (parsed.data && (parsed.data.displayName || parsed.data.photoURL)) {
-          // quick optimistic return (fast UI)
-          return parsed.data;
-        }
-      }
-    }
-
-    // fetch from Firestore
-    const snap = await getDoc(doc(db, 'users', uid));
-    const data = snap.exists() ? snap.data() : { displayName: 'Unknown', photoURL: '' };
-    const serverUpdatedAt = snap.exists() ? data.updatedAt?.seconds || null : null;
-    const toStore = { displayName: data.displayName || 'Unknown', photoURL: data.photoURL || '' };
-    localStorage.setItem(key, JSON.stringify({ _cachedAt: now, serverUpdatedAt, data: toStore }));
-    return toStore;
-  } catch (err) {
-    console.error('getProfileCached err', err);
-    return { displayName: 'Unknown', photoURL: '' };
-  }
-}
-
-// helper: split into chunks (Firestore 'in' supports up to 10)
-function chunkArray(arr, n = 10) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
-
-// resolve owner id if owner stored as email (optional safety)
-async function resolveOwnerId(maybeOwner) {
-  if (!maybeOwner) return null;
-  if (typeof maybeOwner === 'string' && maybeOwner.includes('@')) {
-    try {
-      const q = query(collection(db, 'users'), where('email', '==', maybeOwner), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) return snap.docs[0].id;
-      return maybeOwner;
-    } catch (err) {
-      console.warn('resolveOwnerId failed', err);
-      return maybeOwner;
-    }
-  }
-  return maybeOwner;
-}
-
-// Combined realtime listeners: board doc (title/updatedAt) + collaborators subcollection (live)
-// and then fast batched profile fetch + cached-first UI.
-useEffect(() => {
-  if (!boardId) return;
-  let mounted = true;
-  const boardRef = doc(db, 'boards', boardId);
-  const collabsRef = collection(db, 'boards', boardId, 'collaborators');
-
-  // keep owner value up-to-date for including in UID list
-  const ownerRef = { current: null };
-
-  // board listener (title and timestamps)
-  const unsubBoard = onSnapshot(boardRef, (snap) => {
-    if (!mounted || !snap.exists()) return;
-    const data = snap.data();
-    setBoardTitle(data.title || '(Untitled)');
-    ownerRef.current = data.owner || data.ownerId || null;
-    const ts = data.updatedAt || data.createdAt || null;
-    setLastOpenedShort(timeAgoShort(ts));
-  });
-
-  // collaborators listener
-  const unsubCollabs = onSnapshot(collabsRef, (snap) => {
-    if (!mounted) return;
-    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setCollaborators(docs);
-
-    // build collaboratorUIDs including owner (resolve email->uid if needed)
-    (async () => {
-      const collabIDs = docs.map(d => d.id);
-      let all = Array.from(new Set([...collabIDs]));
-      if (ownerRef.current && !all.includes(ownerRef.current)) {
-        // resolve owner if it's an email string stored in legacy data
-        const maybeResolved = ownerRef.current && ownerRef.current.includes('@') ? await resolveOwnerId(ownerRef.current) : ownerRef.current;
-        if (maybeResolved) all.push(maybeResolved);
-      }
-      if (mounted) setCollaboratorUIDs(all);
-    })();
-  });
-
-  return () => {
-    mounted = false;
-    unsubBoard && unsubBoard();
-    unsubCollabs && unsubCollabs();
-  };
-}, [boardId]);
-
-// Profiles: cached-first rendering, then batch-fetch from users collection using documentId() in chunks
-useEffect(() => {
-  if (!collaboratorUIDs || collaboratorUIDs.length === 0) {
-    setcollaboratorProfiles([]);
-    return;
-  }
-  let cancelled = false;
-  const now = Date.now();
-  const TTL = 1000 * 60 * 60 * 24; // 24h
-
-  // 1) immediate cached-first result
-  const cachedList = collaboratorUIDs.map(uid => {
-    try {
-      const raw = localStorage.getItem(`profile_${uid}`);
-      if (!raw) return { uid, displayName: 'Unknown', photoURL: '' };
-      const parsed = JSON.parse(raw);
-      if (parsed._cachedAt && now - parsed._cachedAt < TTL && parsed.data) {
-        if (parsed.data.displayName || parsed.data.photoURL) return { uid, ...parsed.data };
-      }
-      return { uid, displayName: 'Unknown', photoURL: '' };
-    } catch (e) {
-      return { uid, displayName: 'Unknown', photoURL: '' };
-    }
-  });
-  setcollaboratorProfiles(cachedList);
-
-  // 2) batch fetch fresh profiles from Firestore
-  (async () => {
-    try {
-      const uids = Array.from(new Set(collaboratorUIDs));
-      const chunks = chunkArray(uids, 10); // Firestore 'in' limit = 10
-      const fetches = chunks.map(async (chunk) => {
-        const q = query(collection(db, 'users'), where(documentId(), 'in', chunk));
-        const snap = await getDocs(q);
-        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      });
-      const arrays = await Promise.all(fetches);
-      const flat = arrays.flat();
-      const map = new Map(flat.map(p => [p.uid, { displayName: p.displayName || 'Unknown', photoURL: p.photoURL || '' , email: p.email || 'No email' }]));
-      const ordered = uids.map(uid => {
-          const got = map.get(uid);
-          const out = got || { displayName: 'Unknown', photoURL: '', email: 'Unknown email' };
-          // update cache
-          try {
-            const key = `profile_${uid}`;
-            const toStore = { _cachedAt: Date.now(), data: { displayName: out.displayName, photoURL: out.photoURL, email: out.email } };
-            localStorage.setItem(key, JSON.stringify(toStore));
-          } catch (e) { /* ignore localStorage errors */ }
-          return { uid, ...out };
-      });
-
-      if (!cancelled) setcollaboratorProfiles(ordered);
-    } catch (err) {
-      console.error('Failed to fetch profiles in batch:', err);
-    }
-  })();
-
-  return () => { cancelled = true; };
-}, [collaboratorUIDs]);
-
-  // escape key handler to exit reorder mode
-  useEffect(() => {
-  const onKey = (e) => {
-    if (e.key === 'Escape' && reorderMode) {
-      setReorderMode(false);
-      setDraggingIndex(null);
-      setDragOverIndex(null);
-      showToast('Reorder mode exited', 'info', 1200);
-    }
-  };
-  window.addEventListener('keydown', onKey);
-  return () => window.removeEventListener('keydown', onKey);
-}, [reorderMode]);
-
-// lazy logs
-useEffect(() => {
-    const mountTime = performance.now();
-    console.log("[BoardPage] mounted at", new Date().toLocaleTimeString());
-
-    return () => {
-      const unmountTime = performance.now();
-      console.log(
-        `[BoardPage] unmounted, stayed for ${(unmountTime - mountTime).toFixed(
-          2
-        )}ms`
-      );
-    };
-  }, []);
-
-  // -------------------- realtime images subscription --------------------
-  useEffect(() => {
-    if (!boardId) return;
-
-    setImagesLoading(true); // show skeletons while we subscribe
-
-    const q = query(collection(db, 'boards', boardId, 'images'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // normalize order: if order exists use it; else treat as large number so createdAt sorts next
-        items.sort((a, b) => {
-          const aOrder = (typeof a.order === 'number') ? a.order : Number.MAX_SAFE_INTEGER;
-          const bOrder = (typeof b.order === 'number') ? b.order : Number.MAX_SAFE_INTEGER;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          // fallback: newest first by createdAt
-          const aT = a.createdAt?.seconds || 0;
-          const bT = b.createdAt?.seconds || 0;
-          return bT - aT;
-        });
-        setImages(items);
-        setImagesLoading(false);
-      },
-      (err) => {
-        console.error('images onSnapshot error', err);
-        setImagesLoading(false);
-      }
-    );
-
-    imagesUnsubRef.current = unsubscribe;
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-      imagesUnsubRef.current = null;
-    };
-  }, [boardId]);
 
   // -------------------- Reorder helpers --------------------
 const toggleReorder = () => {
   setReorderMode((s) => {
     // if turning off, clear drag state
     if (s) {
-      setDraggingIndex(null);
-      setDragOverIndex(null);
+      // do nothing for now
     }
     return !s;
   });
 };
-
-
-  // -------------------- per-image realtime comment counts --------------------
-  useEffect(() => {
-    if (!boardId) return;
-    const map = commentCountsUnsubsRef.current;
-
-    // add listeners for new images
-    images.forEach((img) => {
-      if (map.has(img.id)) return;
-      const commentsRef = collection(db, 'boards', boardId, 'images', img.id, 'comments');
-      const unsub = onSnapshot(commentsRef, (snap) => {
-        setCommentCounts((prev) => ({ ...prev, [img.id]: snap.size }));
-      });
-      map.set(img.id, unsub);
-    });
-
-    // remove listeners for images that no longer exist
-    const existingIds = new Set(images.map((i) => i.id));
-    for (const [id, unsub] of Array.from(map.entries())) {
-      if (!existingIds.has(id)) {
-        unsub();
-        map.delete(id);
-        setCommentCounts((prev) => {
-          const copy = { ...prev };
-          delete copy[id];
-          return copy;
-        });
-      }
-    }
-
-    return () => {
-      // cleanup all listeners on unmount
-      // (do not clear cache here)
-      // we'll keep map listeners until component unmounts
-    };
-  }, [images, boardId]);
-
-  // cleanup comment count listeners on unmount
-  useEffect(() => {
-    return () => {
-      commentCountsUnsubsRef.current.forEach((unsub) => unsub());
-      commentCountsUnsubsRef.current.clear();
-    };
-  }, []);
-
-  // -------------------- board comments count + subscription helper --------------------
-  useEffect(() => {
-    if (!boardId) return;
-    const ref = collection(db, 'boards', boardId, 'comments');
-    const unsub = onSnapshot(ref, (snap) => {
-      setBoardCommentsCount(snap.size);
-    });
-    return () => unsub();
-  }, [boardId]);
-
-  // -------------------- fetch board title + lastOpened short --------------------
-  useEffect(() => {
-    const fetchBoardTitle = async () => {
-      if (!boardId) return;
-      const boardRef = doc(db, 'boards', boardId);
-      const boardSnap = await getDoc(boardRef);
-      if (boardSnap.exists()) {
-        const data = boardSnap.data();
-        setBoardTitle(data.title || '(Untitled)');
-        // prefer updatedAt -> lastOpenedAt -> createdAt
-      const ts = data.updatedAt || data.createdAt || null;
-        setLastOpenedShort(timeAgoShort(ts));
-      } else {
-        setBoardTitle('(Board not found)');
-      }
-    };
-
-    fetchBoardTitle();
-  }, [boardId]);
-
-  // update header short time when images change (new pick added)
-useEffect(() => {
-  if (!images || images.length === 0) return;
-  // images expected ordered by createdAt desc — use first one
-  const newestImgTs = images[0].createdAt || null;
-  if (newestImgTs) {
-    setLastOpenedShort(timeAgoShort(newestImgTs));
-  }
-}, [images]); // images is your state from onSnapshot
-
-
-  // -------------------- deep-link: open image modal when ?image=<id> present --------------------
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const imageId = params.get('image');
-    if (!imageId) return;
-
-    if (images && images.length > 0) {
-      const idx = images.findIndex((img) => img.id === imageId);
-      if (idx !== -1) {
-        setModalIndex(idx);
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('image');
-          window.history.replaceState({}, '', url.toString());
-        } catch (err) {}
-        return;
-      }
-    }
-  }, [location.search, images]);
 
 // -------------------- comments handling --------------------
   // open comments modal for a specific image (by index)
@@ -657,50 +325,6 @@ const handleDeleteBoard = async (boardIdParam) => {
   }
 };
 
-
-
-  // -------------------- keyboard navigation (unchanged) --------------------
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (modalIndex === null) return;
-
-      if (e.key === 'ArrowLeft') {
-        setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-      } else if (e.key === 'ArrowRight') {
-        setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-      } else if (e.key === 'Escape') {
-        setModalIndex(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modalIndex, images.length]);
-
-  // -------------------- debug / logging --------------------
-  useEffect(() => {
-    // console.log('collaboratorprofiels:', collaboratorProfiles);
-  }, [boardId, collaboratorProfiles]);
-
-  const menuRef = useRef(null);
-  // Close menu on outside click
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setShowBoardMenu(false);
-      }
-    }
-
-    if (showBoardMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    } else {
-      document.removeEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showBoardMenu]);
   const isMobile = window.innerWidth < 768;
 
   return (
