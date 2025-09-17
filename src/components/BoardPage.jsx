@@ -343,32 +343,7 @@ const toggleReorder = () => {
   });
 };
 
-  // delete a single image comment (optimistic UI + Firestore delete)
-  const handleDeleteImageComment = async (commentId, commentCreatorId, imageId) => {
-    // permission check (client-side): only comment author can delete.
-    if (commentCreatorId !== user.uid) {
-      showToast("You can only delete your own comments", "error", 2200);
-      return;
-    }
-
-    const confirmDelete = window.confirm("Delete this comment?");
-    if (!confirmDelete) return;
-
-    // optimistic UI: remove immediately from local state
-    setCommentList((prev) => prev.filter((c) => c.id !== commentId));
-
-    try {
-      await deleteDoc(doc(db, "boards", boardId, "images", imageId, "comments", commentId));
-      showToast("Comment deleted", "success", 1600);
-    } catch (err) {
-      console.error("Failed to delete image comment", err);
-      showToast("Could not delete comment — try again", "error", 3000);
-      // rollback: re-open subscription for the current image
-      if (typeof openCommentsForIndex === "function" && modalIndex !== null) {
-        openCommentsForIndex(modalIndex);
-      }
-    }
-  };
+ 
 
 // Desktop HTML5 drag handlers
 const onDragStart = (e, index) => {
@@ -557,10 +532,7 @@ useEffect(() => {
     }
   }, [location.search, images]);
 
-
-
-
-  // -------------------- comments handling --------------------
+// -------------------- comments handling --------------------
   // open comments modal for a specific image (by index)
   const openCommentsForIndex = (index) => {
     const image = images[index];
@@ -580,152 +552,21 @@ useEffect(() => {
       setCommentList(enriched);
     });
   };
-
-  const closeComments = () => {
-    setCommentModalOpen(false);
-    setCommentText('');
-    setCommentList([]);
-    if (commentsUnsubRef.current) {
-      commentsUnsubRef.current();
-      commentsUnsubRef.current = null;
-    }
-  };
-
-  const postComment = async () => {
-    if (!commentText.trim()) return;
-    const image = images[modalIndex];
-    if (!image) return;
-    try {
-      const newDocRef = await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
-        text: commentText.trim(),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-      });
-
-      // optionally notify collaborators (excluding the poster)
-      if (notifyFriends && collaborators && collaborators.length > 0) {
-        try {
-          const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
-          const payload = {
-            type: 'comment',
-            text: `${user.displayName || 'Someone'} commented on a pick in ${boardTitle || ''}`,
-            createdAt: serverTimestamp(),
-            read: false,
-            boardId,
-            imageId: image.id,
-            actor: user.uid,
-            url: `/board/${boardId}?image=${image.id}`,
-          };
-          await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
-        } catch (err) {
-          console.warn('Could not create comment notifications', err);
-        }
-      }
-
-      setCommentText('');
-      setNotifyFriends(false); // reset checkbox
-      showToast('Comment posted', 'success', 2000);
-    } catch (err) {
-      console.error('post comment error', err);
-      showToast('Could not post comment', 'error', 3000);
-    }
-  };
-
   // -------------------- board-level comments modal --------------------
-  const openBoardComments = () => {
-    setBoardCommentModalOpen(true);
-    const ref = collection(db, 'boards', boardId, 'comments');
-    const q = query(ref, orderBy('createdAt', 'desc'), limit(200));
-    if (boardCommentsUnsubRef.current) boardCommentsUnsubRef.current();
-    boardCommentsUnsubRef.current = onSnapshot(q, async (snap) => {
-      const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const enriched = await Promise.all(raw.map(async (c) => {
-        const prof = await getProfileCached(c.createdBy);
-        return { ...c, creatorName: prof.displayName, creatorPhoto: prof.photoURL };
-      }));
-      setBoardCommentList(enriched);
-    });
-  };
-
-  const closeBoardComments = () => {
-    setBoardCommentModalOpen(false);
-    setBoardCommentText('');
-    setBoardCommentList([]);
-    if (boardCommentsUnsubRef.current) {
-      boardCommentsUnsubRef.current();
-      boardCommentsUnsubRef.current = null;
-    }
-  };
-
-  const postBoardComment = async () => {
-    if (!boardCommentText.trim()) return;
-    try {
-      const newDocRef = await addDoc(collection(db, 'boards', boardId, 'comments'), {
-        text: boardCommentText.trim(),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
+    const openBoardComments = () => {
+      setBoardCommentModalOpen(true);
+      const ref = collection(db, 'boards', boardId, 'comments');
+      const q = query(ref, orderBy('createdAt', 'desc'), limit(200));
+      if (boardCommentsUnsubRef.current) boardCommentsUnsubRef.current();
+      boardCommentsUnsubRef.current = onSnapshot(q, async (snap) => {
+        const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const enriched = await Promise.all(raw.map(async (c) => {
+          const prof = await getProfileCached(c.createdBy);
+          return { ...c, creatorName: prof.displayName, creatorPhoto: prof.photoURL };
+        }));
+        setBoardCommentList(enriched);
       });
-
-      if (boardNotifyFriends && collaborators && collaborators.length > 0) {
-        try {
-          const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
-          const payload = {
-            type: 'board_comment',
-            text: `${user.displayName || 'Someone'} commented on the board ${boardTitle || ''}`,
-            createdAt: serverTimestamp(),
-            read: false,
-            boardId,
-            actor: user.uid,
-            url: `/board/${boardId}`,
-          };
-          await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
-        } catch (err) {
-          console.warn('Could not create board comment notifications', err);
-        }
-      }
-
-      setBoardCommentText('');
-      setBoardNotifyFriends(false);
-      showToast('Comment posted', 'success', 2000);
-    } catch (err) {
-      console.error('post board comment error', err);
-      showToast('Could not post comment', 'error', 3000);
-    }
-  };
-
-  // delete a board-level comment (only allowed for comment author here)
-  // If you want the board owner to also be able to delete others' comments,
-  // keep an `ownerUID` state (set it when you fetch the board) and allow it.
-  const handleDeleteBoardComment = async (commentId, commentCreatorId) => {
-    // client-side permission check: only the author can delete here
-    if (commentCreatorId !== user.uid) {
-      // optionally allow board owner: if (user.uid !== ownerUID) { ... }
-      showToast("You can only delete your own comments", "error", 2500);
-      return;
-    }
-
-    const confirmDelete = window.confirm("Delete this comment?");
-    if (!confirmDelete) return;
-
-    // optimistic UI update
-    setBoardCommentList((prev) => prev.filter((c) => c.id !== commentId));
-
-    try {
-      await deleteDoc(doc(db, "boards", boardId, "comments", commentId));
-      showToast("Comment deleted", "success", 1800);
-    } catch (err) {
-      console.error("Failed to delete comment", err);
-      showToast("Could not delete comment — try again", "error", 3000);
-
-      // rollback UI (best effort)
-      // re-fetch comments or insert back (simpler: re-open the modal which re-subscribes)
-      if (typeof openBoardComments === "function") {
-        openBoardComments();
-      }
-    }
-  };
-
-  
+    };
 
 
   // delete single image (from Firestore + Supabase if applicable)
@@ -1148,35 +989,42 @@ const handleDeleteBoard = async (boardIdParam) => {
 
       {/* Comments modal (polished, glassy, teal gradient) */}
       <CommentsModal
+        commentsUnsubRef={commentsUnsubRef}
+        openCommentsForIndex={openCommentsForIndex}
         commentModalOpen={commentModalOpen}
-        closeComments={closeComments}
+        setCommentModalOpen={setCommentModalOpen}
         commentList={commentList}
+        setCommentList={setCommentList}
         user={user}
-        handleDeleteImageComment={handleDeleteImageComment}
         images={images}
         modalIndex={modalIndex}
         commentText={commentText}
         setCommentText={setCommentText}
-        postComment={postComment}
+        collaborators={collaborators}
         notifyFriends={notifyFriends}
         setNotifyFriends={setNotifyFriends}
+        showToast={showToast}
+        boardId={boardId}
+        boardTitle={boardTitle}
       />
 
 
       {/* Board comments modal — polished glassy teal style */}
       <BoardCommentsModal
+        boardCommentsUnsubRef={boardCommentsUnsubRef}
+        openBoardComments={openBoardComments}
         boardCommentModalOpen={boardCommentModalOpen}
-        closeBoardComments={closeBoardComments}
+        setBoardCommentModalOpen={setBoardCommentModalOpen}
         boardCommentList={boardCommentList}
+        setBoardCommentList={setBoardCommentList}
         user={user}
-        handleDeleteBoardComment={handleDeleteBoardComment}
         collaboratorProfiles={collaboratorProfiles}
         boardCommentText={boardCommentText}
         setBoardCommentText={setBoardCommentText}
-        postBoardComment={postBoardComment}
         boardNotifyFriends={boardNotifyFriends}
         setBoardNotifyFriends={setBoardNotifyFriends}
         timeAgoShort={timeAgoShort}
+        showToast={showToast}
       />
 
 

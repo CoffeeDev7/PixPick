@@ -1,22 +1,104 @@
-import React from 'react';
+
 
 const BoardCommentsModal = ({
+  boardCommentsUnsubRef,
+  openBoardComments,
   boardCommentModalOpen,
-  closeBoardComments,
+  setBoardCommentModalOpen,
   boardCommentList,
+  setBoardCommentList,
   user,
-  handleDeleteBoardComment,
   collaboratorProfiles,
   boardCommentText,
   setBoardCommentText,
-  postBoardComment,
   boardNotifyFriends,
   setBoardNotifyFriends,
   timeAgoShort,
+  showToast
 }) => {
   if (!boardCommentModalOpen) {
     return null;
   }
+
+
+  
+    const closeBoardComments = () => {
+      setBoardCommentModalOpen(false);
+      setBoardCommentText('');
+      setBoardCommentList([]);
+      if (boardCommentsUnsubRef.current) {
+        boardCommentsUnsubRef.current();
+        boardCommentsUnsubRef.current = null;
+      }
+    };
+
+      // delete a board-level comment (only allowed for comment author here)
+      // If you want the board owner to also be able to delete others' comments,
+      // keep an `ownerUID` state (set it when you fetch the board) and allow it.
+    const handleDeleteBoardComment = async (commentId, commentCreatorId) => {
+      // client-side permission check: only the author can delete here
+      if (commentCreatorId !== user.uid) {
+        // optionally allow board owner: if (user.uid !== ownerUID) { ... }
+        showToast("You can only delete your own comments", "error", 2500);
+        return;
+      }
+  
+      const confirmDelete = window.confirm("Delete this comment?");
+      if (!confirmDelete) return;
+  
+      // optimistic UI update
+      setBoardCommentList((prev) => prev.filter((c) => c.id !== commentId));
+  
+      try {
+        await deleteDoc(doc(db, "boards", boardId, "comments", commentId));
+        showToast("Comment deleted", "success", 1800);
+      } catch (err) {
+        console.error("Failed to delete comment", err);
+        showToast("Could not delete comment — try again", "error", 3000);
+  
+        // rollback UI (best effort)
+        // re-fetch comments or insert back (simpler: re-open the modal which re-subscribes)
+        if (typeof openBoardComments === "function") {
+          openBoardComments();
+        }
+      }
+    };
+
+    const postBoardComment = async () => {
+      if (!boardCommentText.trim()) return;
+      try {
+        const newDocRef = await addDoc(collection(db, 'boards', boardId, 'comments'), {
+          text: boardCommentText.trim(),
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+  
+        if (boardNotifyFriends && collaborators && collaborators.length > 0) {
+          try {
+            const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+            const payload = {
+              type: 'board_comment',
+              text: `${user.displayName || 'Someone'} commented on the board ${boardTitle || ''}`,
+              createdAt: serverTimestamp(),
+              read: false,
+              boardId,
+              actor: user.uid,
+              url: `/board/${boardId}`,
+            };
+            await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+          } catch (err) {
+            console.warn('Could not create board comment notifications', err);
+          }
+        }
+  
+        setBoardCommentText('');
+        setBoardNotifyFriends(false);
+        showToast('Comment posted', 'success', 2000);
+      } catch (err) {
+        console.error('post board comment error', err);
+        showToast('Could not post comment', 'error', 3000);
+      }
+    };
 
   return (
     <>

@@ -1,22 +1,110 @@
-
+import {
+  doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
+  limit, setDoc, where,
+  writeBatch,
+} from 'firebase/firestore';
+import { db } from '../../firebase';
 // This new component handles the comments modal
 const CommentsModal = ({
+  commentsUnsubRef,
   commentModalOpen,
-  closeComments,
+  setCommentModalOpen,
   commentList,
+  setCommentList,
   user,
-  handleDeleteImageComment,
   images,
   modalIndex,
   commentText,
   setCommentText,
-  postComment,
+  collaborators,
   notifyFriends,
   setNotifyFriends,
+  showToast,
+  boardId,
+  boardTitle,
 }) => {
   if (!commentModalOpen) {
     return null;
   }
+
+   const postComment = async () => {
+      if (!commentText.trim()) return;
+      const image = images[modalIndex];
+      if (!image) return;
+      try {
+        const newDocRef = await addDoc(collection(db, 'boards', boardId, 'images', image.id, 'comments'), {
+          text: commentText.trim(),
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+  
+        // optionally notify collaborators (excluding the poster)
+        if (notifyFriends && collaborators && collaborators.length > 0) {
+          try {
+            const collaboratorUIDs = collaborators.map(c => c.id).filter(uid => uid && uid !== user.uid);
+            const payload = {
+              type: 'comment',
+              text: `${user.displayName || 'Someone'} commented on a pick in ${boardTitle || ''}`,
+              createdAt: serverTimestamp(),
+              read: false,
+              boardId,
+              imageId: image.id,
+              actor: user.uid,
+              url: `/board/${boardId}?image=${image.id}`,
+            };
+            await Promise.all(collaboratorUIDs.map(uid => addDoc(collection(db, 'users', uid, 'notifications'), payload)));
+          } catch (err) {
+            console.warn('Could not create comment notifications', err);
+          }
+        }
+  
+        setCommentText('');
+        setNotifyFriends(false); // reset checkbox
+        showToast('Comment posted', 'success', 2000);
+      } catch (err) {
+        console.error('post comment error', err);
+        showToast('Could not post comment', 'error', 3000);
+      }
+    };
+
+    const closeComments = () => {
+    setCommentModalOpen(false);
+    setCommentText('');
+    setCommentList([]);
+    if (commentsUnsubRef.current) {
+      commentsUnsubRef.current();
+      commentsUnsubRef.current = null;
+    }
+  };
+
+   // delete a single image comment (optimistic UI + Firestore delete)
+  const handleDeleteImageComment = async (commentId, commentCreatorId, imageId) => {
+    // permission check (client-side): only comment author can delete.
+    if (commentCreatorId !== user.uid) {
+      showToast("You can only delete your own comments", "error", 2200);
+      return;
+    }
+
+    const confirmDelete = window.confirm("Delete this comment?");
+    if (!confirmDelete) return;
+
+    // optimistic UI: remove immediately from local state
+    setCommentList((prev) => prev.filter((c) => c.id !== commentId));
+
+    try {
+      await deleteDoc(doc(db, "boards", boardId, "images", imageId, "comments", commentId));
+      showToast("Comment deleted", "success", 1600);
+    } catch (err) {
+      console.error("Failed to delete image comment", err);
+      showToast("Could not delete comment — try again", "error", 3000);
+      // rollback: re-open subscription for the current image
+      if (typeof openCommentsForIndex === "function" && modalIndex !== null) {
+        openCommentsForIndex(modalIndex);
+      }
+    }
+  };
+
+  
 
   return (
     <>
