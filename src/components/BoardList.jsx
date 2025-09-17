@@ -184,7 +184,14 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
       [newImgs[0], newImgs[previewIndex]] = [newImgs[previewIndex], newImgs[0]];
       setCardImgs(newImgs);
     };
-
+    const SIZES = {
+    // tweak these percentages to change visual proportions inside card
+    mainPercent: 0.62, // main image gets ~62% of the card width
+    previewPercent: 0.38,
+    mainHeight: 180, // px height for the visual. Change to suit your design.
+    gap: 8,
+  };
+  
     return (
       <div
         role="article"
@@ -196,17 +203,20 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
           background: "linear-gradient(180deg,#f6f8f9,#eef4f5)",
           boxShadow: "0 8px 20px rgba(11,22,28,0.08)",
           display: "grid",
-          gridTemplateColumns: "1fr 120px",
-          gap: 10,
+          gridTemplateColumns: "1fr 80px",// 2nd arg must atleast be 0px to be aesthetic. dont remove 2nd arg.
+          gap: 0,
         }}
       >
+        {/* Left side of card */}
         <div style={{ position: "relative", minHeight: 140 }}>
+          {/* board cover */}
           <img
             src={cardImgs[0]}
             alt={board.title || "Board cover"}
             style={{
               width: "100%",
-              height: "100%",
+              height: '200px',
+              //maxHeight:'170px', //ensures long images don't overflow
               objectFit: "cover",
               display: "block",
             }}
@@ -224,7 +234,8 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
               gap: 8,
             }}
           >
-            <div style={{ color: "#fff", textShadow: "0 4px 12px rgba(0,0,0,0.5)" }}>
+            {/* board name,ownerid, date */}
+            <div style={{ color: "#fff", textShadow: "0 4px 12px rgba(0,0,0,0.5)" ,whiteSpace: "nowrap"}}>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{board.title || "Untitled Board"}</div>
               <div style={{ fontSize: 12, opacity: 0.95 }}>
                 {board.ownerDisplayName ? board.ownerDisplayName : (board.ownerId ? board.ownerId.slice(0, 6) : "owner")} ·{" "}
@@ -232,7 +243,8 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {/*3 picks */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center" ,flexShrink: 0}}>
               <div style={{ fontSize: 13, background: "rgba(255,255,255,0.12)", padding: "6px 8px", borderRadius: 8, color: "#fff", fontWeight: 700 }}>
                 {board.numImages ?? "—"} picks
               </div>
@@ -240,50 +252,33 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
           </div>
         </div>
 
-        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8, flexDirection: "column", alignItems: "stretch" }}>
+        {/*------ Right side of card ---------*/}
+        <div style={{ padding: 0, display: "flex", flexDirection: "column" }}>
+          {/* preview images */}
+          <div style={{ display: "flex", gap: 0, flexDirection: "column", alignItems: "stretch"}}>
             {[1, 2].map((i) => (
               <img
                 key={i}
                 src={cardImgs[i]}
                 alt={`preview ${i}`}
-                style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8, cursor: "pointer" }}
+                style={{ 
+                  width: "100%",
+                  height: '100px', //MUST ALWAYS BE DOUBLE OF COVER's HEIGHT
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  background: "#eee",
+                  objectFit: "cover",
+                  display: "block",
+                  cursor: "pointer"
+                }}
                 loading="lazy"
                 onClick={(e) => onPreviewClick(e, i)}
               />
             ))}
           </div>
 
-          <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {(board.collaborators || []).slice(0, 3).map((c, idx) => {
-                const photo = c.photoURL || "https://picsum.photos/seed/pixpick/800/450";
-                return (
-                  <div
-                    key={idx}
-                    title={c.displayName || c.id}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      overflow: "hidden",
-                      border: "2px solid #fff",
-                      transform: `translateX(-${idx * 10}px)`,
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-                      background: "#ddd",
-                    }}
-                  >
-                    {photo ? <img src={photo} alt={c.displayName || "user"} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{(c.displayName || "U").slice(0, 1)}</div>}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <div style={{ fontSize: 12, color: "#334", opacity: 0.9 }}>{board.collaborators?.length ?? 0} collaborators</div>
-              <div style={{ fontSize: 12, color: "#334", opacity: 0.9 }}>{board.numImages ?? "—"} images</div>
-            </div>
-          </div>
+          {/* collaborator icons */}
+          
         </div>
       </div>
     );
