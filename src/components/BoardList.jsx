@@ -296,7 +296,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
 
   // Render logic
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: 12 ,backgroundColor: "linear-gradient(nulldeg,rgba(65, 132, 165, 1) 0%, rgba(242, 242, 242, 1) 45%, rgba(65, 132, 165, 1) 100%)", borderRadius: 12}}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>{selected} <span style={{ color: "#6b7280", fontSize: 14, marginLeft: 8 }}>({boards.length})</span></h3>
         <div style={{ display: "flex", gap: 8 }}>
