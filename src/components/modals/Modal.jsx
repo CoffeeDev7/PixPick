@@ -97,7 +97,6 @@ const ImageModal = ({
   commentCounts,
   openCommentsForIndex,
   handleDeleteImage,
-  isMobile,
 }) => {
   if (modalIndex === null) return null;
   const [infoOpen, setInfoOpen] = React.useState(false);

@@ -5,7 +5,6 @@ import { db } from '../firebase';
 import {
   doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
   limit, setDoc, where,
-  writeBatch,
 } from 'firebase/firestore';
 import './BoardPage.css'; 
 import ImageGrid from './ImageGrid'; 
@@ -22,9 +21,7 @@ export default function BoardPage({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   // Reorder state (jiggle + drag)
-const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag
-const [draggingIndex, setDraggingIndex] = useState(null);
-const [dragOverIndex, setDragOverIndex] = useState(null);
+const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
 
   const [images, setImages] = useState([]);
   const [boardTitle, setBoardTitle] = useState('');
@@ -35,7 +32,6 @@ const [dragOverIndex, setDragOverIndex] = useState(null);
   const [collaboratorUIDs, setCollaboratorUIDs] = useState([]);
   const [collaboratorProfiles, setcollaboratorProfiles] = useState([]);
 
-  // NEW: loading flag for images
   const [imagesLoading, setImagesLoading] = useState(true);
 
   // Board menu (3-dots)
@@ -343,89 +339,6 @@ const toggleReorder = () => {
   });
 };
 
- 
-
-// Desktop HTML5 drag handlers
-const onDragStart = (e, index) => {
-  if (!reorderMode) return;
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', String(index));
-  setDraggingIndex(index);
-  // small transparent drag image to avoid ghost
-  try {
-    const img = document.createElement('img');
-    img.src = '/transparent-1x1.png'; // optional transparent 1x1 in public; optional fallback
-    e.dataTransfer.setDragImage(img, 0, 0);
-  } catch (err) { /* ignore */ }
-};
-
-const onDragOver = (e, index) => {
-  if (!reorderMode) return;
-  e.preventDefault(); // allow drop
-  if (dragOverIndex !== index) setDragOverIndex(index);
-};
-
-const onDrop = async (e, index) => {
-  if (!reorderMode) return;
-  e.preventDefault();
-  const from = Number(e.dataTransfer.getData('text/plain'));
-  const to = index;
-
-  if (Number.isNaN(from)) {
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-    return;
-  }
-  if (from === to) {
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-    return;
-  }
-
-  // local reorder
-  const newImages = [...images];
-  const [moved] = newImages.splice(from, 1);
-  newImages.splice(to, 0, moved);
-  setImages(newImages);
-
-  // persist immediately
-  await persistOrder(newImages);
-
-  setDraggingIndex(null);
-  setDragOverIndex(null);
-};
-
-const onDragEnd = () => {
-  setDraggingIndex(null);
-  setDragOverIndex(null);
-};
-
-// fallback move-by-button for mobile / accessibility
-const moveImageBy = async (fromIndex, toIndex) => {
-  if (fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) return;
-  const newImages = [...images];
-  const [moved] = newImages.splice(fromIndex, 1);
-  newImages.splice(toIndex, 0, moved);
-  setImages(newImages);
-  await persistOrder(newImages);
-};
-
-// write 'order' field to Firestore in a batch (index 0 = first)
-const persistOrder = async (orderedImages) => {
-  if (!boardId) return;
-  try {
-    const batch = writeBatch(db);
-    orderedImages.forEach((img, idx) => {
-      const imgRef = doc(db, 'boards', boardId, 'images', img.id);
-      batch.update(imgRef, { order: idx });
-    });
-    await batch.commit();
-    showToast('Order saved', 'success', 1800);
-  } catch (err) {
-    console.error('persistOrder error', err);
-    showToast('Could not persist order — try again', 'error', 3000);
-  }
-};
 
   // -------------------- per-image realtime comment counts --------------------
   useEffect(() => {
@@ -570,66 +483,64 @@ useEffect(() => {
 
 
   // delete single image (from Firestore + Supabase if applicable)
-const handleDeleteImage = async (imageId, index) => {
-  const confirmDelete = window.confirm("Delete this pick?");
-  if (!confirmDelete) {
-    return;
-  }
-
-  setModalIndex(null); // close modal if open
-
-  try {
-    // 1. Get Firestore doc
-    const imageDocRef = doc(db, "boards", boardId, "images", imageId);
-    //console.log("[Delete] Fetching Firestore doc:", imageDocRef.path);
-
-    const imageDocSnap = await getDoc(imageDocRef);
-    if (!imageDocSnap.exists()) {
-      console.warn("[Delete] Firestore doc does not exist for:", imageId);
-    } else {
-      console.log("[Delete] Firestore doc data:", imageDocSnap.data());
+  const handleDeleteImage = async (imageId, index) => {
+    const confirmDelete = window.confirm("Delete this pick?");
+    if (!confirmDelete) {
+      return;
     }
 
-    if (imageDocSnap.exists()) {
-      const { src, storage } = imageDocSnap.data();
-      //console.log("[Delete] Image src from Firestore:", src);
-      //console.log("[Delete] Storage object from Firestore:", storage);
+    setModalIndex(null); // close modal if open
 
-      if (storage?.path) {
-        // 2. Derive Supabase storage path
-        const storagePath = storage.path;
-        //console.log("[Delete] Derived storage path:", storagePath);
+    try {
+      // 1. Get Firestore doc
+      const imageDocRef = doc(db, "boards", boardId, "images", imageId);
+      //console.log("[Delete] Fetching Firestore doc:", imageDocRef.path);
 
-        // 3. Try Supabase delete
-        const { data, error: supabaseError } = await supabase.storage
-          .from("pixpick-images")
-          .remove([storagePath]);
-
-        //console.log("[Delete] Supabase response:", { data, supabaseError });
-
-        if (supabaseError) {
-          console.error("[Delete] Supabase deletion error:", supabaseError);
-          showToast("Could not delete from storage", "error", 3000);
-          return; // bail out before Firestore delete
-        }
+      const imageDocSnap = await getDoc(imageDocRef);
+      if (!imageDocSnap.exists()) {
+        console.warn("[Delete] Firestore doc does not exist for:", imageId);
       } else {
-        console.warn("[Delete] No src field found in Firestore doc");
+        console.log("[Delete] Firestore doc data:", imageDocSnap.data());
       }
+
+      if (imageDocSnap.exists()) {
+        const { src, storage } = imageDocSnap.data();
+        //console.log("[Delete] Image src from Firestore:", src);
+        //console.log("[Delete] Storage object from Firestore:", storage);
+
+        if (storage?.path) {
+          // 2. Derive Supabase storage path
+          const storagePath = storage.path;
+          //console.log("[Delete] Derived storage path:", storagePath);
+
+          // 3. Try Supabase delete
+          const { data, error: supabaseError } = await supabase.storage
+            .from("pixpick-images")
+            .remove([storagePath]);
+
+          //console.log("[Delete] Supabase response:", { data, supabaseError });
+
+          if (supabaseError) {
+            console.error("[Delete] Supabase deletion error:", supabaseError);
+            showToast("Could not delete from storage", "error", 3000);
+            return; // bail out before Firestore delete
+          }
+        } else {
+          console.warn("[Delete] No src field found in Firestore doc");
+        }
+      }
+
+      // 4. Delete Firestore doc
+      //console.log("[Delete] Deleting Firestore doc:", imageDocRef.path);
+      await deleteDoc(imageDocRef);
+
+      console.log("[Delete] Successfully deleted Firestore doc:", imageId);
+      showToast("Pick deleted", "success", 2500);
+    } catch (err) {
+      console.error("[Delete] Unexpected error:", err);
+      showToast("Could not delete pick", "error", 3000);
     }
-
-    // 4. Delete Firestore doc
-    //console.log("[Delete] Deleting Firestore doc:", imageDocRef.path);
-    await deleteDoc(imageDocRef);
-
-    console.log("[Delete] Successfully deleted Firestore doc:", imageId);
-    showToast("Pick deleted", "success", 2500);
-  } catch (err) {
-    console.error("[Delete] Unexpected error:", err);
-    showToast("Could not delete pick", "error", 3000);
-  }
-};
-
-
+  };
 
   // -------------------- Share board logic --------------------
   const handleShareBoard = async () => {
@@ -961,17 +872,9 @@ const handleDeleteBoard = async (boardIdParam) => {
       {/* Images grid */}
       <ImageGrid
         images={images}
-        imagesLoading={imagesLoading}
         reorderMode={reorderMode}
         setReorderMode={setReorderMode}
-        draggingIndex={draggingIndex}
-        dragOverIndex={dragOverIndex}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        onDragEnd={onDragEnd}
         setModalIndex={setModalIndex}
-        handleDeleteImage={handleDeleteImage}
       />
 
 
@@ -1025,6 +928,9 @@ const handleDeleteBoard = async (boardIdParam) => {
         setBoardNotifyFriends={setBoardNotifyFriends}
         timeAgoShort={timeAgoShort}
         showToast={showToast}
+        boardId={boardId}
+        boardTitle={boardTitle}
+        collaborators={collaborators}
       />
 
 

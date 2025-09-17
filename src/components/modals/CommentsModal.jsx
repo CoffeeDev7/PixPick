@@ -1,7 +1,5 @@
 import {
-  doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
-  limit, setDoc, where,
-  writeBatch,
+  doc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc, limit,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 // This new component handles the comments modal

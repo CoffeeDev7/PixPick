@@ -1,4 +1,7 @@
-
+import {
+  doc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc, limit,
+} from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const BoardCommentsModal = ({
   boardCommentsUnsubRef,
@@ -9,12 +12,15 @@ const BoardCommentsModal = ({
   setBoardCommentList,
   user,
   collaboratorProfiles,
+  collaborators,
   boardCommentText,
   setBoardCommentText,
   boardNotifyFriends,
   setBoardNotifyFriends,
   timeAgoShort,
-  showToast
+  showToast,
+  boardId,
+  boardTitle,
 }) => {
   if (!boardCommentModalOpen) {
     return null;
