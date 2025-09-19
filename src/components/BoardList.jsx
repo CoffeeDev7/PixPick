@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestor
 import { db } from "../firebase";
 
 /* -------------------- BoardCard (top-level, memoized) -------------------- */
-const BoardCard = React.memo(function BoardCard({ board, imgs = [], placeholder, timeAgoShort }) {
+const BoardCard = React.memo(function BoardCard({ board, imgs = [], placeholder, timeAgoShort, density, setDensity }) {
   const navigate = useNavigate();
 
   const cardImgs = useMemo(() => [
@@ -39,7 +39,7 @@ const BoardCard = React.memo(function BoardCard({ board, imgs = [], placeholder,
         background: "linear-gradient(180deg,#f6f8f9,#eef4f5)",
         boxShadow: "0 8px 20px rgba(11,22,28,0.8)",
         display: "grid",
-        gridTemplateColumns: "1fr 80px",
+        gridTemplateColumns: density==='many'? "1fr 80px" : "1fr 0px",
         gap: 0,
         cursor: "pointer",
       }}
@@ -117,6 +117,11 @@ const BoardCard = React.memo(function BoardCard({ board, imgs = [], placeholder,
   const pa = prev.imgs || [], na = next.imgs || [];
   if (pa.length !== na.length) return false;
   for (let i = 0; i < pa.length; i++) if (pa[i] !== na[i]) return false;
+
+   // NEW: re-render when layout-affecting props change
+  if ((prev.density || "") !== (next.density || "")) return false;
+  if ((prev.placeholder || "") !== (next.placeholder || "")) return false;
+
   return true; // equal -> skip render
 });
 
@@ -125,6 +130,9 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   const [boards, setBoards] = useState([]);
   const [latestboardimages, setLatestBoardImages] = useState({});
   const [loading, setLoading] = useState(true);
+
+  // state for board card density
+  const [density, setDensity] = useState('one'); //80px for many, 0px for single
 
   // Responsive window hook
   function useWindowSize() {
@@ -290,8 +298,8 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>{selected} <span style={{ color: "#6b7280", fontSize: 14, marginLeft: 8 }}>({boards.length})</span></h3>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="bp-btn" onClick={() => { /* optional view change */ }} aria-label="grid view">Grid</button>
-          <button className="bp-btn" onClick={() => { /* optional view change */ }} aria-label="list view">List</button>
+          <button className="bp-btn" onClick={() =>  setDensity('one') } style={{ outline: 'none', border: 'none', background: density === 'one' ? '#178589' : '#fff', color: density === 'one' ? '#fff' : '#178589' }} aria-label="grid view">One</button>
+          <button className="bp-btn" onClick={() => setDensity('many')} style={{ outline: 'none', border: 'none', background: density === 'many' ? '#178589' : '#fff', color: density === 'many' ? '#fff' : '#178589' }} aria-label="list view" disabled={loading}>Many</button>
         </div>
       </div>
 
@@ -307,7 +315,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 12 }}>
           {boardsToRender.map(({ board, imgs }) => {
             // pass original board and imgs (memoized behavior in BoardCard comparator will prevent unnecessary rerenders)
-            return <BoardCard key={board.id} board={board} imgs={imgs} placeholder={placeholder} timeAgoShort={timeAgoShort} />;
+            return <BoardCard key={board.id} board={board} imgs={imgs} placeholder={placeholder} timeAgoShort={timeAgoShort} density={density} setDensity={setDensity} />;
           })}
         </div>
       )}
