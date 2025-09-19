@@ -52,26 +52,57 @@ const BoardCard = React.memo(function BoardCard({ board, imgs = [], placeholder,
           style={{ width: "100%", height: "200px", objectFit: "cover", display: "block" }}
           loading="lazy"
         />
-        <div style={{
-          position: "absolute", left: 8, bottom: 8, right: 8,
-          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
-        }}>
-          <div style={{ color: "#fff", textShadow: "0 4px 12px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
-            <div style={{ fontWeight: 700, fontSize: 16, opacity: 0.7 }}>{board.title || "Untitled Board"}</div>
+
+        {/* gradient overlay bar */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: "8px",
+            background: "linear-gradient(to top, rgba(0,0,0,0.6), rgba(24, 24, 24, 0.4))",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              color: "#fff",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 16 , opacity: 0.6}}>
+              {board.title || "Untitled Board"}
+            </div>
             <div style={{ fontSize: 12, opacity: 0.45 }}>
-              {board.ownerDisplayName ? board.ownerDisplayName : (board.ownerId ? board.ownerId.slice(0, 6) : "owner")} ·{" "}
-              {timeAgoShort(board.updatedAt || board.createdAt)}
+              {board.ownerDisplayName
+                ? board.ownerDisplayName
+                : board.ownerId
+                ? board.ownerId.slice(0, 6)
+                : "owner"}{" "}
+              · {timeAgoShort(board.updatedAt || board.createdAt)}
             </div>
           </div>
 
-          {/* commented out counts preserved */}
+          {/* optional counts area, still commented */}
           {/* <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-            <div style={{ fontSize: 13, background: "rgba(255,255,255,0.12)", padding: "6px 8px", borderRadius: 8, color: "#fff", fontWeight: 700 }}>
+            <div style={{
+              fontSize: 13,
+              background: "rgba(255,255,255,0.12)",
+              padding: "6px 8px",
+              borderRadius: 8,
+              color: "#fff",
+              fontWeight: 700
+            }}>
               {board.numImages ?? "—"} picks
             </div>
           </div> */}
         </div>
       </div>
+
 
       {/* Right (previews) */}
       <div style={{ padding: 0, display: "flex", flexDirection: "column" }}>
@@ -292,9 +323,12 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
     });
   }, [boards, latestboardimages]);
 
+  
+  const isDesktop = width >= 900; // choose breakpoint you prefer
+
   // Render
   return (
-    <div style={{ padding: 12, backgroundColor: "linear-gradient(nulldeg,rgba(65, 132, 165, 1) 0%, rgba(242, 242, 242, 1) 45%, rgba(65, 132, 165, 1) 100%)", borderRadius: 12 }}>
+    <div style={{ padding: isDesktop? 32 : 2, borderRadius: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>{selected} <span style={{ color: "#6b7280", fontSize: 14, marginLeft: 8 }}>({boards.length})</span></h3>
         <div style={{ display: "flex", gap: 8 }}>
