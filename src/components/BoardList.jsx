@@ -284,6 +284,11 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
                 marginBottom: 0, // grid manages spacing
                 minHeight: SIZES.mainHeight + 40,
               }}
+              onMouseEnter={(e) => (
+                e.currentTarget.style.transform = "translateY(-7px)",
+                e.currentTarget.style.boxShadow = "0 8px 8px rgba(16, 17, 17, 0.5)"
+              )}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)", e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)")}
             >
               <strong>{board.title || "Untitled Board"}</strong>
 

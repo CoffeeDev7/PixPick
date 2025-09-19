@@ -245,17 +245,6 @@ useEffect(() => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // // Lazy load BoardPage with timing log
-  // const BoardPage = lazy(async () => {
-  //   const start = performance.now();
-  //   const module = await import("./components/BoardPage");
-  //   const end = performance.now();
-  //   console.log(
-  //     `[LazyLoad] BoardPage chunk loaded in ${(end - start).toFixed(2)}ms`
-  //   );
-  //   return module;
-  // });
-
   return (
     <div className="fade-in" style={{ margin: 0, padding: 0, boxSizing: 'border-box' }}>
       {/* TOP Deep Teal HEADER */}
@@ -299,6 +288,7 @@ useEffect(() => {
                   style={{
                     position: "absolute",
                     right: 0,
+                    left: -230,
                     top: "36px",
                     width: 320,
                     maxWidth: "calc(100vw - 32px)",
@@ -462,7 +452,7 @@ useEffect(() => {
             <button
               aria-label="Profile menu"
               onClick={() => setProfileMenuOpen((s) => !s)}
-              style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: 'transparent', border: 'none',outline: 'none', padding: 4, cursor: 'pointer', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <img
                 src={user.photoURL || '/default-avatar.png'}
@@ -516,9 +506,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Desktop ephemeral notification toast (bottom-right of header) */}
-      {/* ---------- Polished glassy desktop toast (render in your JSX) ---------- */}
-
 {/* inline keyframes for toast animation + optional small style block */}
 <style dangerouslySetInnerHTML={{
   __html: `
@@ -526,9 +513,6 @@ useEffect(() => {
     @keyframes desktop-toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px) scale(.99); } }
   `
 }} />
-
-{/* Desktop ephemeral notification toast (top-right of header) */}
-{/* ---------- Polished desktop toast JSX (replace the avatar block with this) ---------- */}
 
 {/* Desktop ephemeral notification toast (top-right of header) */}
 {desktopNotif && (
@@ -659,8 +643,8 @@ useEffect(() => {
 
       {/* Sidebar Modal Overlay */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: sidebarVisible ? 'rgba(0,0,0,0.3)' : 'transparent', pointerEvents: sidebarVisible ? 'auto' : 'none', transition: 'background-color 0.3s ease', zIndex: 100 }} onClick={() => setSidebarVisible(false)}>
-        <div style={{ width: '290px', height: '100%', background: '#f5f5f5', padding: '0.2rem', boxSizing: 'border-box', boxShadow: '2px 0 6px rgba(0,0,0,0.2)', transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.3s ease', position: 'absolute', left: 0, top: 0, backgroundColor: '#e3f2fd', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-          <Sidebar selected={selected} width={280} setSelected={(s) => { setSelected(s); setSidebarVisible(false); navigate('/'); }} setSidebarVisible={setSidebarVisible} user={user} />
+        <div style={{ width: '250px', height: '100%', background: '#f5f5f5', padding: '0.2rem', boxSizing: 'border-box', boxShadow: '2px 0 6px rgba(0,0,0,0.2)', transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.3s ease', position: 'absolute', left: 0, top: 0, backgroundColor: '#e3f2fd', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <Sidebar selected={selected} width={250} setSelected={(s) => { setSelected(s); setSidebarVisible(false); navigate('/'); }} setSidebarVisible={setSidebarVisible} user={user} />
         </div>
       </div>
 

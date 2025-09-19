@@ -215,9 +215,7 @@ export default function Sidebar({
         <div style={{ fontSize: 15, color: TEXT, fontWeight: 600 }}>
           Notifications
         </div>
-        <div style={{ marginLeft: 'auto', fontSize: 13, color: '#8b98a1' }}>
-          Recent
-        </div>
+        
       </div>
 
       {/* Friends link */}
@@ -247,9 +245,6 @@ export default function Sidebar({
         <img src={friendsicon} alt="Friends" style={{ width: 22, height: 22 }} />
         <div style={{ fontSize: 15, color: TEXT, fontWeight: 600 }}>
           Friends
-        </div>
-        <div style={{ marginLeft: 'auto', fontSize: 13, color: '#8b98a1' }}>
-          Social
         </div>
       </div>
     </div>

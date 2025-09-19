@@ -465,6 +465,7 @@ const handleDeleteBoard = async (boardIdParam) => {
               objectFit: 'cover',
               transform: `translateX(-${i * 10}px)`,
               zIndex: collaboratorProfiles.length - i,
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
             }}
           />
 
@@ -513,50 +514,21 @@ const handleDeleteBoard = async (boardIdParam) => {
         isMobile={isMobile}
       />
     
-
       {/* Comments modal (polished, glassy, teal gradient) */}
       <CommentsModal
-        commentsUnsubRef={commentsUnsubRef}
-        openCommentsForIndex={openCommentsForIndex}
-        commentModalOpen={commentModalOpen}
-        setCommentModalOpen={setCommentModalOpen}
-        commentList={commentList}
-        setCommentList={setCommentList}
-        user={user}
-        images={images}
-        modalIndex={modalIndex}
-        commentText={commentText}
-        setCommentText={setCommentText}
-        collaborators={collaborators}
-        notifyFriends={notifyFriends}
-        setNotifyFriends={setNotifyFriends}
-        showToast={showToast}
-        boardId={boardId}
-        boardTitle={boardTitle}
+        commentsUnsubRef={commentsUnsubRef} openCommentsForIndex={openCommentsForIndex} commentModalOpen={commentModalOpen} setCommentModalOpen={setCommentModalOpen}
+        commentList={commentList} setCommentList={setCommentList} user={user} images={images} modalIndex={modalIndex} commentText={commentText}
+        setCommentText={setCommentText} collaborators={collaborators} notifyFriends={notifyFriends} setNotifyFriends={setNotifyFriends} showToast={showToast}
+        boardId={boardId} boardTitle={boardTitle}
       />
-
 
       {/* Board comments modal — polished glassy teal style */}
       <BoardCommentsModal
-        boardCommentsUnsubRef={boardCommentsUnsubRef}
-        openBoardComments={openBoardComments}
-        boardCommentModalOpen={boardCommentModalOpen}
-        setBoardCommentModalOpen={setBoardCommentModalOpen}
-        boardCommentList={boardCommentList}
-        setBoardCommentList={setBoardCommentList}
-        user={user}
-        collaboratorProfiles={collaboratorProfiles}
-        boardCommentText={boardCommentText}
-        setBoardCommentText={setBoardCommentText}
-        boardNotifyFriends={boardNotifyFriends}
-        setBoardNotifyFriends={setBoardNotifyFriends}
-        timeAgoShort={timeAgoShort}
-        showToast={showToast}
-        boardId={boardId}
-        boardTitle={boardTitle}
-        collaborators={collaborators}
+        boardCommentsUnsubRef={boardCommentsUnsubRef} openBoardComments={openBoardComments} boardCommentModalOpen={boardCommentModalOpen}
+        setBoardCommentModalOpen={setBoardCommentModalOpen} boardCommentList={boardCommentList} setBoardCommentList={setBoardCommentList}
+        user={user} collaboratorProfiles={collaboratorProfiles} boardCommentText={boardCommentText}  setBoardCommentText={setBoardCommentText}
+        boardNotifyFriends={boardNotifyFriends} setBoardNotifyFriends={setBoardNotifyFriends} timeAgoShort={timeAgoShort}  showToast={showToast} boardId={boardId} boardTitle={boardTitle} collaborators={collaborators}
       />
-
 
       {/* Toast */}
       <Toast toast={toast} setToast={setToast} />

@@ -243,7 +243,7 @@
 /* On Hover make background grey */
 .onhoverbggrey {
   background: transparent;
-  color: #333;
+  color: #333333;
   border: none;
   padding: 8px;
   border-radius: 8px;
@@ -256,7 +256,7 @@
 }
 
 .onhoverbggrey:hover {
-  background: #908c8c; /* grey on hover */
+  background: #777b7e; /* grey on hover */
 }
 
 .onhoverbggrey.active {
