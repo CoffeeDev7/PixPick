@@ -28,7 +28,7 @@ import {
   useOutsideClick,
   useFetchBoardTitle,
 } from '../hooks/BoardPage.hooks';
-
+import chatBubble from '../assets/comment-svgrepo-com.svg'
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -410,9 +410,7 @@ const handleDeleteBoard = async (boardIdParam) => {
                 >
                   {/* chat bubble svg */}
                   <div style={{ position: "relative", display: "inline-block" }}>
-                    <svg width="20" height="20"  viewBox="0 0 24 24"fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
+                    <img src={chatBubble} alt="Chat bubble" style={{ width: 20, height: 20 }} />
 
                     {/* count badge */}
                     {boardCommentsCount > 0 && (
