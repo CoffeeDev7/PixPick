@@ -234,7 +234,6 @@ const handleShareBoard = () => {
         style="width:36px; height:36px; border-radius:50%;" />
       <div style="display:flex; flex-direction:column;">
         <strong>Karthik</strong>
-        <small>satyakarthik2020@gmail.com</small>
       </div>
     </div>
     <div style="display:flex; justify-content:flex-end; gap: 8px;">
