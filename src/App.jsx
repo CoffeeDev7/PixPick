@@ -21,9 +21,13 @@ export default function App() {
 
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const location = useLocation();
+  // If this navigation has a background saved, it'll be here:
+  const backgroundLocation = location.state && location.state.background;
+
   const navigate = useNavigate();
 
-  const isBoardPage = location.pathname.startsWith('/board/');
+  // make header hide only when this is a real board page (not modal)
+  const isBoardPage = location.pathname.startsWith('/board/') && !backgroundLocation;
   const [authLoading, setAuthLoading] = useState(true);
 
   // notifications state (for top header)
@@ -34,6 +38,15 @@ export default function App() {
   // desktop toast state (tiny ephemeral notification animation)
   const [desktopNotif, setDesktopNotif] = useState(null); // {id, title, text}
 
+
+  // Prevent background scroll while modal is open (when backgroundLocation exists)
+  useEffect(() => {
+    if (backgroundLocation) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [backgroundLocation]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -247,7 +260,7 @@ useEffect(() => {
 
   return (
     <div className="fade-in" style={{ margin: 0, padding: 0, boxSizing: 'border-box' }}>
-      {/* TOP Deep Teal HEADER */}
+      {/* header area --- use isBoardPage computed above */}
       {!isBoardPage && (
         <div style={{ backgroundColor: '#1b999fff', padding: '12px 0', display: 'flex', alignItems: 'center', gap: '12px', position: 'fixed', left: 0, right: 0, top: 0, height: '45px', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
           <button onClick={() => setSidebarVisible(true)} style={{ fontSize: '24px', background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: '-12px' }}>☰</button>
@@ -651,9 +664,13 @@ useEffect(() => {
       {/* Main Content Area */}
       <div style={{ padding: isBoardPage? '0rem': '0.8rem', marginTop: isBoardPage ? '0px' : 'calc(60px + 12px)', transition: 'margin-top 0.3s ease' ,
         background:'linear-gradient(90deg,rgba(162, 161, 166, 1) 0%, rgba(201, 211, 212, 1) 55%, rgba(145, 162, 163, 1) 100%)'}}>
-        <Routes>
+          {/* Note: render main routes using backgroundLocation OR the current location.
+            That way, when backgroundLocation exists, the router will render the background
+            (BoardList) while we render the modal below for the current location. */}
+        <Routes location={backgroundLocation || location}>
           <Route path="/" element={
             <>
+              {/* your home: board list */}
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
                 <h2 style={{ margin: 0, marginLeft: '12px' }}>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
@@ -661,10 +678,55 @@ useEffect(() => {
               <BoardList user={user} selected={selected} boardsCache={boardsCache} setBoardsCache={setBoardsCache}/>
             </>
           } />
+
+          {/* When visited directly (no background), this will render full-page */}
           <Route path="/board/:id" element={<BoardPage user={user} />} />
           <Route path="/notifications" element={<NotificationsPage user={user} />} />
           <Route path="/friends" element={<Friends user={user} />} />
         </Routes>
+
+        {/* If there *is* a backgroundLocation, render the modal route on top */}
+        {backgroundLocation && (
+          <Routes>
+            <Route path="/board/:id" element={
+              <div
+                role="dialog"
+                aria-modal="true"
+                style={{
+                  position: 'fixed',
+                  inset: 0,                // top:0; right:0; bottom:0; left:0;
+                  zIndex: 1200,
+                  background: 'rgba(0,0,0,0.36)', // dim the background
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'stretch',
+                  paddingTop: 0,
+                }}
+                onClick={(e) => {
+                  // clicking the overlay (outside the modal box) should close modal
+                  // but let clicks inside BoardPage propagate (BoardPage has its own layout)
+                  if (e.target === e.currentTarget) navigate(-1);
+                }}
+              >
+                <div
+                  style={{
+                    width: '100vw',
+                    height: '100vh',
+                    maxWidth: '100vw',
+                    maxHeight: '100vh',
+                    overflow: 'auto',
+                    background: 'transparent', // keep BoardPage control its background so it matches full-screen look
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  {/* BoardPage expects to be full-screen — render it directly */}
+                  <BoardPage user={user} />
+                </div>
+              </div>
+            }/>
+          </Routes>
+        )}
       </div>
 
       <style>{`

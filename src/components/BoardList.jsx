@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link , useLocation } from "react-router-dom";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase";
 
 export default function BoardList({ user, boardsCache, setBoardsCache, selected }) {
+  const location = useLocation();
   const [boards, setBoards] = useState([]);
   const [latestboardimages, setLatestBoardImages] = useState({});
   const [viewMode, setViewMode] = useState("wide");
@@ -272,6 +273,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
             <Link
               key={board.id}
               to={to}
+              state={{ background: location }} //  <<< important , pass current location in state 
               style={{
                 ...boardItemStyle,
                 display: "block",

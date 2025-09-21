@@ -1,7 +1,6 @@
 // ImageGrid.jsx
 import React, { useEffect, useRef } from "react";
 import Muuri from "muuri";
-import "./ImageGrid.css";
 
 const ImageGrid = ({
   images = [],
