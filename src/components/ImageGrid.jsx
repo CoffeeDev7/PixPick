@@ -1,6 +1,7 @@
 // ImageGrid.jsx
 import React, { useEffect, useRef } from "react";
 import Muuri from "muuri";
+import "./ImageGrid.css";
 
 const ImageGrid = ({
   images = [],
@@ -190,6 +191,13 @@ const ImageGrid = ({
   return (
     <>
       <style>{`
+      
+.muuri-item:not(.muuri-item-dragging):hover .muuri-content > img {
+  cursor: pointer;
+  transform: scale(1.04);
+  transition: transform 0.3s ease-out;
+  z-index: 10;
+}
         /* Scoped muuri styles (important: avoid global collisions) */
         .muuri-wrapper { width:100%; }
         .muuri-scroll { width:100%; }
@@ -234,7 +242,7 @@ animation: jiggle 0.9s ease-in-out infinite;
         <div className="muuri-scroll">
           <div className="muuri-grid" ref={gridRef}>
             {images.map((img, i) => (
-              <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)}>
+              <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)} >
                 <div className="muuri-content" onClick={() => { if (reorderMode) return; setModalIndex?.(i); }}>
                   <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} style={{boxShadow: '4px 4px 5px rgba(0,0,0,0.5)'}} className={`image ${reorderMode ? 'jiggle' : ''}`}
 />

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board | Pinspire</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .pin {
+            transition: all 0.3s ease;
+        }
+        .pin:hover {
+            transform: scale(1.03);
+        }
+        .pin-actions {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .pin:hover .pin-actions {
+            opacity: 1;
+        }
+        .rating-stars {
+            display: inline-flex;
+            direction: rtl;
+        }
+        .rating-stars input {
+            display: none;
+        }
+        .rating-stars label {
+            color: #d1d5db;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+        .rating-stars input:checked ~ label,
+        .rating-stars label:hover,
+        .rating-stars label:hover ~ label {
+            color: #f59e0b;
+        }
+        .page-transition {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="flex items-center">
+                        <i data-feather="image" class="text-indigo-600"></i>
+                        <span class="ml-2 text-xl font-bold text-indigo-600">Pinspire</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="index.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Home</a>
+                    <a href="#" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Create</a>
+                    <a href="#" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Profile</a>
+                    <button class="p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700">
+                        <i data-feather="plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="page-transition">
+        <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <!-- Board Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Movie Stars</h1>
+                    <p class="text-gray-500 mt-2">Private board • 45 pins • 2 collaborators</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex space-x-3">
+                    <button class="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
+                        <i data-feather="users" class="mr-2"></i>
+                        Invite
+                    </button>
+                    <button class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        <i data-feather="plus" class="mr-2"></i>
+                        Add Pin
+                    </button>
+                </div>
+            </div>
+
+            <!-- Drag and Drop Zone -->
+            <div class="dropzone mb-8 rounded-lg p-12 text-center cursor-pointer">
+                <div class="max-w-md mx-auto">
+                    <i data-feather="upload" class="mx-auto text-gray-400 w-12 h-12"></i>
+                    <h3 class="mt-4 text-lg font-medium text-gray-700">Drag and drop images here</h3>
+                    <p class="mt-1 text-sm text-gray-500">Or click to browse your files</p>
+                </div>
+            </div>
+
+            <!-- Pins Masonry Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Pin 1 -->
+                <div class="pin bg-white rounded-lg overflow-hidden shadow-md relative">
+                    <img src="http://static.photos/people/640x360/1" alt="Pin" class="w-full h-auto">
+                    <div class="p-4">
+                        <h3 class="font-medium text-gray-800">Scarlett Johansson</h3>
+                        <p class="text-gray-500 text-sm mt-1">Added by @alex</p>
+                        
+                        <!-- Rating System (Subtle) -->
+                        <div class="mt-2 rating-stars">
+                            <input type="radio" id="star5-1" name="rating-1" value="5" />
+                            <label for="star5-1" title="5 stars">★</label>
+                            <input type="radio" id="star4-1" name="rating-1" value="4" />
+                            <label for="star4-1" title="4 stars">★</label>
+                            <input type="radio" id="star3-1" name="rating-1" value="3" />
+                            <label for="star3-1" title="3 stars">★</label>
+                            <input type="radio" id="star2-1" name="rating-1" value="2" />
+                            <label for="star2-1" title="2 stars">★</label>
+                            <input type="radio" id="star1-1" name="rating-1" value="1" />
+                            <label for="star1-1" title="1 star">★</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Pin Actions -->
+                    <div class="absolute top-2 right-2 pin-actions flex space-x-1">
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="share-2" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="heart" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="more-vertical" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pin 2 -->
+                <div class="pin bg-white rounded-lg overflow-hidden shadow-md relative">
+                    <img src="http://static.photos/people/640x360/2" alt="Pin" class="w-full h-auto">
+                    <div class="p-4">
+                        <h3 class="font-medium text-gray-800">Chris Hemsworth</h3>
+                        <p class="text-gray-500 text-sm mt-1">Added by @sam</p>
+                        
+                        <div class="mt-2 rating-stars">
+                            <input type="radio" id="star5-2" name="rating-2" value="5" />
+                            <label for="star5-2" title="5 stars">★</label>
+                            <input type="radio" id="star4-2" name="rating-2" value="4" />
+                            <label for="star4-2" title="4 stars">★</label>
+                            <input type="radio" id="star3-2" name="rating-2" value="3" />
+                            <label for="star3-2" title="3 stars">★</label>
+                            <input type="radio" id="star2-2" name="rating-2" value="2" />
+                            <label for="star2-2" title="2 stars">★</label>
+                            <input type="radio" id="star1-2" name="rating-2" value="1" />
+                            <label for="star1-2" title="1 star">★</label>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute top-2 right-2 pin-actions flex space-x-1">
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="share-2" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="heart" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="more-vertical" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pin 3 -->
+                <div class="pin bg-white rounded-lg overflow-hidden shadow-md relative">
+                    <img src="http://static.photos/people/640x360/3" alt="Pin" class="w-full h-auto">
+                    <div class="p-4">
+                        <h3 class="font-medium text-gray-800">Margot Robbie</h3>
+                        <p class="text-gray-500 text-sm mt-1">Added by @alex</p>
+                        
+                        <div class="mt-2 rating-stars">
+                            <input type="radio" id="star5-3" name="rating-3" value="5" />
+                            <label for="star5-3" title="5 stars">★</label>
+                            <input type="radio" id="star4-3" name="rating-3" value="4" />
+                            <label for="star4-3" title="4 stars">★</label>
+                            <input type="radio" id="star3-3" name="rating-3" value="3" />
+                            <label for="star3-3" title="3 stars">★</label>
+                            <input type="radio" id="star2-3" name="rating-3" value="2" />
+                            <label for="star2-3" title="2 stars">★</label>
+                            <input type="radio" id="star1-3" name="rating-3" value="1" />
+                            <label for="star1-3" title="1 star">★</label>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute top-2 right-2 pin-actions flex space-x-1">
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="share-2" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="heart" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="more-vertical" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pin 4 -->
+                <div class="pin bg-white rounded-lg overflow-hidden shadow-md relative">
+                    <img src="http://static.photos/people/640x360/4" alt="Pin" class="w-full h-auto">
+                    <div class="p-4">
+                        <h3 class="font-medium text-gray-800">Tom Holland</h3>
+                        <p class="text-gray-500 text-sm mt-1">Added by @sam</p>
+                        
+                        <div class="mt-2 rating-stars">
+                            <input type="radio" id="star5-4" name="rating-4" value="5" />
+                            <label for="star5-4" title="5 stars">★</label>
+                            <input type="radio" id="star4-4" name="rating-4" value="4" />
+                            <label for="star4-4" title="4 stars">★</label>
+                            <input type="radio" id="star3-4" name="rating-4" value="3" />
+                            <label for="star3-4" title="3 stars">★</label>
+                            <input type="radio" id="star2-4" name="rating-4" value="2" />
+                            <label for="star2-4" title="2 stars">★</label>
+                            <input type="radio" id="star1-4" name="rating-4" value="1" />
+                            <label for="star1-4" title="1 star">★</label>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute top-2 right-2 pin-actions flex space-x-1">
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="share-2" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="heart" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                            <i data-feather="more-vertical" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        AOS.init();
+        feather.replace();
+
+        // Enhanced drag and drop functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropzone = document.querySelector('.dropzone');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropzone.classList.add('active');
+            }
+
+            function unhighlight() {
+                dropzone.classList.remove('active');
+            }
+
+            dropzone.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            function handleFiles(files) {
+                ([...files]).forEach(uploadFile);
+            }
+
+            function uploadFile(file) {
+                // Here you would handle the file upload
+                console.log('File to upload:', file.name);
+                // Create a preview of the image
+                if (file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onloadend = function() {
+                        const img = document.createElement('img');
+                        img.src = reader.result;
+                        img.className = 'w-full h-auto';
+                        
+                        // Create a new pin element
+                        const pin = document.createElement('div');
+                        pin.className = 'pin bg-white rounded-lg overflow-hidden shadow-md relative';
+                        
+                        // Add the image to the pin
+                        pin.appendChild(img);
+                        
+                        // Add pin info section
+                        const info = document.createElement('div');
+                        info.className = 'p-4';
+                        
+                        const title = document.createElement('h3');
+                        title.className = 'font-medium text-gray-800';
+                        title.textContent = 'New Upload';
+                        
+                        const addedBy = document.createElement('p');
+                        addedBy.className = 'text-gray-500 text-sm mt-1';
+                        addedBy.textContent = 'Added just now';
+                        
+                        info.appendChild(title);
+                        info.appendChild(addedBy);
+                        pin.appendChild(info);
+                        
+                        // Add to the grid
+                        const grid = document.querySelector('.grid');
+                        grid.insertBefore(pin, grid.firstChild);
+                    };
+                }
+            }
+
+            // Click to upload functionality
+            dropzone.addEventListener('click', function() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.multiple = true;
+                input.onchange = function(e) {
+                    handleFiles(e.target.files);
+                };
+                input.click();
+            });
+        });
+    </script>
+</body>
+</html>

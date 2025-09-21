@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinspire | Your Visual Collaboration Space</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .board-card {
+            transition: all 0.3s ease;
+        }
+        .board-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .dropzone {
+            border: 2px dashed #ccc;
+            transition: all 0.3s ease;
+        }
+        .dropzone.active {
+            border-color: #6366f1;
+            background-color: rgba(99, 102, 241, 0.05);
+        }
+        .pin {
+            transition: all 0.3s ease;
+        }
+        .pin:hover {
+            transform: scale(1.03);
+        }
+        .page-transition {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="#" class="flex items-center">
+                        <i data-feather="image" class="text-indigo-600"></i>
+                        <span class="ml-2 text-xl font-bold text-indigo-600">Pinspire</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="#" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Home</a>
+                    <a href="#" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Create</a>
+                    <a href="#" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Profile</a>
+                    <button class="p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700">
+                        <i data-feather="plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="page-transition">
+        <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">Your Boards</h1>
+                <button class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                    <i data-feather="plus" class="mr-2"></i>
+                    New Board
+                </button>
+            </div>
+
+            <!-- Boards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Board Card 1 -->
+                <a href="board.html" class="board-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl">
+                    <div class="h-48 bg-gradient-to-r from-purple-400 via-pink-500 to-red-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg text-gray-800">Travel Inspiration</h3>
+                        <p class="text-gray-500 text-sm mt-1">12 pins • 3 collaborators</p>
+                    </div>
+                </a>
+
+                <!-- Board Card 2 -->
+                <a href="board.html" class="board-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl">
+                    <div class="h-48 bg-gradient-to-r from-green-400 to-blue-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg text-gray-800">Food & Recipes</h3>
+                        <p class="text-gray-500 text-sm mt-1">24 pins • 5 collaborators</p>
+                    </div>
+                </a>
+
+                <!-- Board Card 3 -->
+                <a href="board.html" class="board-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl">
+                    <div class="h-48 bg-gradient-to-r from-yellow-400 via-red-500 to-pink-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg text-gray-800">Fashion Trends</h3>
+                        <p class="text-gray-500 text-sm mt-1">18 pins • 2 collaborators</p>
+                    </div>
+                </a>
+
+                <!-- Board Card 4 -->
+                <a href="board.html" class="board-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl">
+                    <div class="h-48 bg-gradient-to-r from-blue-400 to-indigo-600"></div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg text-gray-800">Tech Gadgets</h3>
+                        <p class="text-gray-500 text-sm mt-1">32 pins • 4 collaborators</p>
+                    </div>
+                </a>
+
+                <!-- Board Card 5 -->
+                <a href="board.html" class="board-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl">
+                    <div class="h-48 bg-gradient-to-r from-red-400 to-purple-600"></div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg text-gray-800">Movie Stars</h3>
+                        <p class="text-gray-500 text-sm mt-1">45 pins • Private</p>
+                    </div>
+                </a>
+
+                <!-- Create New Board Card -->
+                <div class="board-card bg-white rounded-lg overflow-hidden shadow-md border-2 border-dashed border-gray-300 hover:border-indigo-400 flex items-center justify-center">
+                    <div class="p-6 text-center">
+                        <i data-feather="plus" class="mx-auto text-gray-400 w-10 h-10"></i>
+                        <h3 class="mt-2 font-medium text-gray-500">Create new board</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        AOS.init();
+        feather.replace();
+
+        // Drag and drop functionality for images
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropzones = document.querySelectorAll('.dropzone');
+            
+            dropzones.forEach(dropzone => {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, preventDefaults, false);
+                });
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, highlight, false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, unhighlight, false);
+                });
+
+                function highlight() {
+                    dropzone.classList.add('active');
+                }
+
+                function unhighlight() {
+                    dropzone.classList.remove('active');
+                }
+
+                dropzone.addEventListener('drop', handleDrop, false);
+
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    handleFiles(files);
+                }
+
+                function handleFiles(files) {
+                    ([...files]).forEach(uploadFile);
+                }
+
+                function uploadFile(file) {
+                    // Here you would handle the file upload
+                    console.log('File to upload:', file.name);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
