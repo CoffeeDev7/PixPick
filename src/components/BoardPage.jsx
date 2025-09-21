@@ -211,44 +211,99 @@ const toggleReorder = () => {
   };
 
   // -------------------- Share board logic --------------------
-  const handleShareBoard = async () => {
-    const email = prompt('Enter email of person to share with');
-    if (!email || !email.trim()) return;
-    try {
-      const q = query(collection(db, 'users'), where('email', '==', email.trim()));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        showToast('User not found', 'error', 3000);
-        return;
-      }
-      const userDoc = snap.docs[0];
-      const uid = userDoc.id;
+const handleShareBoard = () => {
+  // make a quick overlay with an input + your card
+  const overlay = document.createElement("div");
+  overlay.style = `
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #fff; padding: 16px; border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; gap: 12px; z-index: 9999;
+    width: 300px;
+  `;
+  overlay.innerHTML = `
+    <label style="font-weight: bold;">Enter email to share:</label>
+    <input type="text" id="shareEmailInput" placeholder="Enter email"
+      style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%;" />
+    <div id="quickCard" style="
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      padding: 8px; border: 1px solid #eee; border-radius: 6px;
+      background: #f9f9f9;
+    ">
+      <img src="https://lh3.googleusercontent.com/a/ACg8ocIeDVvBYzPUvLuvJvrLEZ_m32K__iYmw1dKDc-WQnQXWlhRASdC=s96-c"
+        style="width:36px; height:36px; border-radius:50%;" />
+      <div style="display:flex; flex-direction:column;">
+        <strong>Karthik</strong>
+        <small>satyakarthik2020@gmail.com</small>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap: 8px;">
+      <button id="cancelShareBtn" style="padding:6px 12px;">Cancel</button>
+      <button id="confirmShareBtn" style="padding:6px 12px; background:#4caf50; color:#fff; border:none; border-radius:4px;">Share</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 
-      // write collaborator doc
-      await setDoc(doc(db, 'boards', boardId, 'collaborators', uid), { role: 'collaborator', addedAt: serverTimestamp() });
+  const input = overlay.querySelector("#shareEmailInput");
+  const quickCard = overlay.querySelector("#quickCard");
+  const cancelBtn = overlay.querySelector("#cancelShareBtn");
+  const confirmBtn = overlay.querySelector("#confirmShareBtn");
 
-      // OPTIONAL: create a notification for that user
-      try {
-        const payload = {
-          type: 'shared_board',
-          text: `${user.displayName || 'Someone'} shared a board with you: ${boardTitle || ''}`,
-          createdAt: serverTimestamp(),
-          read: false,
-          boardId,
-          actor: user.uid,
-          url: `/board/${boardId}`,
-        };
-        await addDoc(collection(db, 'users', uid, 'notifications'), payload);
-      } catch (err) {
-        console.warn('Could not create share notification', err);
-      }
-
-      showToast('Board shared', 'success', 2500);
-    } catch (err) {
-      console.error('share board error', err);
-      showToast('Could not share board', 'error', 3000);
-    }
+  quickCard.onclick = () => {
+    input.value = "satyakarthik2020@gmail.com"; // autofill
   };
+
+  cancelBtn.onclick = () => {
+    document.body.removeChild(overlay);
+  };
+
+  confirmBtn.onclick = async () => {
+    const email = input.value.trim();
+    if (!email) return;
+    await shareWithEmail(email);
+    document.body.removeChild(overlay);
+  };
+};
+
+const shareWithEmail = async (email) => {
+  try {
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      showToast("User not found", "error", 3000);
+      return;
+    }
+    const userDoc = snap.docs[0];
+    const uid = userDoc.id;
+
+    await setDoc(doc(db, "boards", boardId, "collaborators", uid), {
+      role: "collaborator",
+      addedAt: serverTimestamp(),
+    });
+
+    try {
+      const payload = {
+        type: "shared_board",
+        text: `${user.displayName || "Someone"} shared a board with you: ${boardTitle || ""}`,
+        createdAt: serverTimestamp(),
+        read: false,
+        boardId,
+        actor: user.uid,
+        url: `/board/${boardId}`,
+      };
+      await addDoc(collection(db, "users", uid, "notifications"), payload);
+    } catch (err) {
+      console.warn("Could not create share notification", err);
+    }
+
+    showToast("Board shared", "success", 2500);
+  } catch (err) {
+    console.error("share board error", err);
+    showToast("Could not share board", "error", 3000);
+  }
+};
+
+
 
   // -------------------- board rename / delete (3-dot menu) --------------------
   const handleRename = async (boardIdParam, currentTitle) => {
