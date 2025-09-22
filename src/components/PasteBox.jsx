@@ -224,12 +224,19 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
       }
     }
 
-    if (!handled) {
-      const text = event.dataTransfer.getData("text") || "";
-      if (text) {
-        await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
-        handled = true;
-      }
+    // ✅ If a file was handled, exit early (prevents double-processing)
+    if (handled) {
+      setDragActive(false);
+      setOverlayVisible(false);
+      try { event.dataTransfer.clearData(); } catch (e) {}
+      return;
+    }
+
+   // Only reach here if no file was processed
+    const text = event.dataTransfer.getData("text") || "";
+    if (text) {
+    await handlePaste({ clipboardData: { getData: () => text, items: [] }, preventDefault: () => {}, target: event.target });
+      handled = true;
     }
 
     setDragActive(false);
