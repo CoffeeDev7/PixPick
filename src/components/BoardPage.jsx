@@ -36,6 +36,12 @@ export default function BoardPage({ user }) {
   const location = useLocation();
   const menuRef = useRef(null);
   
+  // multi-select state
+const [multiSelectMode, setMultiSelectMode] = useState(false);
+const [selectedImages, setSelectedImages] = useState(new Set()); // Set of image ids
+const [bulkDeleting, setBulkDeleting] = useState(false);
+
+
   // Reorder state (jiggle + drag)
 const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
 
@@ -112,6 +118,38 @@ const toggleReorder = () => {
     return !s;
   });
 };
+
+const toggleSelectImage = (imageId) => {
+  setSelectedImages((prev) => {
+    const next = new Set(prev);
+    if (next.has(imageId)) next.delete(imageId);
+    else next.add(imageId);
+    return next;
+  });
+};
+
+// select all images currently loaded
+const selectAllImages = () => {
+  setSelectedImages(new Set(images.map(i => i.id)));
+};
+const clearSelection = () => setSelectedImages(new Set());
+
+// keyboard delete key handling for multi-select
+useEffect(() => {
+  const onKey = (e) => {
+    if (!multiSelectMode) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImages.size > 0) {
+      e.preventDefault();
+      handleDeleteSelected();
+    }
+    if (e.key === 'Escape' && multiSelectMode) {
+      setMultiSelectMode(false);
+      clearSelection();
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [multiSelectMode, selectedImages]);
 
 // -------------------- comments handling --------------------
   // open comments modal for a specific image (by index)
@@ -209,6 +247,82 @@ const toggleReorder = () => {
       showToast("Could not delete pick", "error", 3000);
     }
   };
+
+  // delete multiple selected images (from Firestore + Supabase if applicable)
+  const handleDeleteSelected = async () => {
+  if (selectedImages.size === 0) return;
+  const confirmDelete = window.confirm(`Delete ${selectedImages.size} selected picks? This cannot be undone.`);
+  if (!confirmDelete) return;
+
+  setBulkDeleting(true);
+  showToast(`Deleting ${selectedImages.size} picks...`, 'info', 20000);
+
+  try {
+    // gather docs for selected images
+    const selectedIds = Array.from(selectedImages);
+    // fetch metadata for each (to read storage.path if present)
+    const docRefs = selectedIds.map(id => doc(db, 'boards', boardId, 'images', id));
+    // read docs in parallel
+    const docSnaps = await Promise.all(docRefs.map(r => getDoc(r)));
+
+    // collect supabase storage paths to remove
+    const urlPrefix = import.meta.env.VITE_SUPABASE_URLPREFIX || '';
+    const storagePaths = [];
+
+    // docs to delete (where doc exists)
+    const docsToDelete = [];
+
+    docSnaps.forEach((snap, idx) => {
+      if (!snap.exists()) return;
+      const d = snap.data() || {};
+      docsToDelete.push({ id: snap.id, data: d });
+      if (d.storage?.path) {
+        storagePaths.push(d.storage.path);
+      } else if (d.src && urlPrefix && d.src.startsWith(urlPrefix)) {
+        // derive path from signed url prefix -> remove prefix
+        storagePaths.push(d.src.replace(urlPrefix, ''));
+      }
+    });
+
+    // 1) remove files from Supabase (if any)
+    if (storagePaths.length > 0) {
+      try {
+        const { error: supabaseError } = await supabase.storage
+          .from('pixpick-images')
+          .remove(storagePaths);
+        if (supabaseError) {
+          console.warn('Supabase bulk delete error:', supabaseError);
+          // don't fully abort: still attempt to delete Firestore docs, but notify user
+          showToast('Some storage deletions failed — check console', 'error', 5000);
+        }
+      } catch (err) {
+        console.error('Supabase bulk delete exception:', err);
+        showToast('Storage deletion failed — check console', 'error', 5000);
+      }
+    }
+
+    // 2) delete Firestore docs
+    await Promise.all(docsToDelete.map(d => deleteDoc(doc(db, 'boards', boardId, 'images', d.id))));
+
+    // 3) success cleanup
+    setSelectedImages(new Set());
+    setMultiSelectMode(false);
+    showToast(`Deleted ${docsToDelete.length} picks`, 'success', 3500);
+
+    // If modal is open on a deleted image, close it
+    if (modalIndex != null) {
+      const modalImage = images[modalIndex];
+      if (modalImage && selectedIds.includes(modalImage.id)) {
+        setModalIndex(null);
+      }
+    }
+  } catch (err) {
+    console.error('Bulk delete failed:', err);
+    showToast('Could not delete selected picks', 'error', 5000);
+  } finally {
+    setBulkDeleting(false);
+  }
+};
 
   // -------------------- Share board logic --------------------
 const handleShareBoard = () => {
@@ -416,6 +530,48 @@ const handleDeleteBoard = async (boardIdParam) => {
           <span style={{ fontSize: 13 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
           </button>
 
+        {/* Multi-select toggle */}
+        <button
+          onClick={() => {
+            const turningOn = !multiSelectMode;
+            setMultiSelectMode(turningOn);
+            if (!turningOn) clearSelection();
+          }}
+          title={multiSelectMode ? "Exit select mode" : "Select multiple picks"}
+          className="onhoverbggrey"
+          style={{ marginRight: 6 }}
+        >
+          {multiSelectMode ? 'Cancel' : 'Select'}
+        </button>
+
+        {multiSelectMode && (
+          <>
+            <button
+              onClick={() => selectedImages.size === images.length ? clearSelection() : selectAllImages()}
+              className="onhoverbggrey"
+              style={{ marginRight: 6 }}
+            >
+              {selectedImages.size === images.length ? 'Clear' : 'Select all'}
+            </button>
+
+            <button
+              onClick={handleDeleteSelected}
+              disabled={selectedImages.size === 0 || bulkDeleting}
+              style={{
+                background: selectedImages.size > 0 ? '#ee6c4d' : 'rgba(0,0,0,0.06)',
+                color: selectedImages.size > 0 ? '#fff' : '#666',
+                border: 'none',
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: selectedImages.size > 0 && !bulkDeleting ? 'pointer' : 'not-allowed'
+              }}
+              title="Delete selected picks"
+            >
+              Delete {selectedImages.size > 0 ? `(${selectedImages.size})` : ''}
+            </button>
+          </>
+        )}
+
           <button aria-label="Board settings"
             title='Board settings'
             className='onhoverbggrey'
@@ -554,6 +710,9 @@ const handleDeleteBoard = async (boardIdParam) => {
         reorderMode={reorderMode}
         setReorderMode={setReorderMode}
         setModalIndex={setModalIndex}
+        multiSelectMode={multiSelectMode}
+        selectedImages={selectedImages}
+        toggleSelectImage={toggleSelectImage}
       />
 
 

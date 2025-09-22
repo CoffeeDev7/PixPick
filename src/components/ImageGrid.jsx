@@ -9,7 +9,10 @@ const ImageGrid = ({
   // tweak these to control columns + spacing
   columns = { xl: 6, lg: 5, md: 4, sm: 3, xs: 2 },
   gap = 8, // gap in px between images (horizontal space between items)
-  storageKey = "pixpick-order"
+  storageKey = "pixpick-order",
+  multiSelectMode = false,      // NEW
+  selectedImages = new Set(),   // NEW
+  toggleSelectImage = () => {}, // NEW
 }) => {
   const tag = "[ImageGrid]";
   const gridRef = useRef(null);
@@ -176,6 +179,7 @@ const ImageGrid = ({
       }
     }
   }, [reorderMode]);
+  
 
   // ---- STABLE CSS: use margin = gap/2 so horizontal gutter math becomes simple ----
   // item margin = gap/2 -> per-item horizontal margin contribution = gap (left+right sum)
@@ -238,19 +242,76 @@ animation: jiggle 0.9s ease-in-out infinite;
       `}</style>
 
       <div className="muuri-wrapper">
-        <div className="muuri-scroll">
-          <div className="muuri-grid" ref={gridRef}>
-            {images.map((img, i) => (
-              <div className="muuri-item" key={img.id ?? i} data-id={String(img.id ?? i)} >
-                <div className="muuri-content" onClick={() => { if (reorderMode) return; setModalIndex?.(i); }}>
-                  <img src={img.src} alt={img.alt ?? `image-${i}`} draggable={false} style={{boxShadow: '4px 4px 5px rgba(0,0,0,0.5)'}} className={`image ${reorderMode ? 'jiggle' : ''}`}
-/>
+      <div className="muuri-scroll">
+        <div className="muuri-grid" ref={gridRef}>
+          {images.map((img, i) => {
+            const isSelected = selectedImages.has(img.id);
+
+            return (
+              <div
+                className="muuri-item"
+                key={img.id ?? i}
+                data-id={String(img.id ?? i)}
+                style={{  cursor: multiSelectMode ? "pointer" : "auto" }}
+                onClick={(e) => {
+                  if (reorderMode) return;
+                  if (multiSelectMode) {
+                    e.stopPropagation();
+                    toggleSelectImage(img.id);
+                    return;
+                  }
+                  setModalIndex?.(i);
+                }}
+              >
+                <div className="muuri-content">
+                  <img
+                    src={img.src}
+                    alt={img.alt ?? `image-${i}`}
+                    draggable={false}
+                    style={{ boxShadow: "4px 4px 5px rgba(0,0,0,0.5)" }}
+                    className={`image ${reorderMode ? "jiggle" : ""}`}
+                  />
                 </div>
+
+                {/* checkbox overlay */}
+                {multiSelectMode && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelectImage(img.id);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      display: "grid",
+                      placeItems: "center",
+                      background: isSelected
+                        ? "linear-gradient(90deg,#1B99BF,#2B5FA8)"
+                        : "rgba(255,255,255,0.9)",
+                      color: isSelected ? "#fff" : "#0b6b7a",
+                      boxShadow: "0 4px 10px rgba(2,6,10,0.12)",
+                      border: isSelected ? "none" : "1px solid rgba(0,0,0,0.08)",
+                      zIndex: 5, // ensure above image
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectImage(img.id)}
+                      style={{ width: 16, height: 16, cursor: "pointer" }}
+                    />
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
+    </div>
     </>
   );
 };
