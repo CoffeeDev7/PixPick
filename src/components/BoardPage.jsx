@@ -28,7 +28,7 @@ import {
   useOutsideClick,
   useFetchBoardTitle,
 } from '../hooks/BoardPage.hooks';
-
+import Loader from './Loader';
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -497,7 +497,10 @@ const handleDeleteBoard = async (boardIdParam) => {
 
   return (
     <div style={{ marginTop: '0px' }} className='boardpage'>
-      {/* back button  */}
+      { /* show loader while images are loading */ }
+      <Loader visible={imagesLoading} text={`Loading ${boardTitle ? boardTitle : 'board'}…`} />
+
+        {/* back button  */}
         <button className="fixed-back-btn" onClick={() => navigate(-1)} aria-label="Go back" title="Back">
         {/* simple left chevron SVG */}
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
