@@ -3,6 +3,7 @@ import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/fires
 import { db } from "../../firebase"; // adjust path if needed
 import "./CreateBoardModal.css"; // optional: for custom styles
 import confetti from "canvas-confetti";
+import { FiPlus} from 'react-icons/fi';
 
 export default function CreateBoardModal({ user, onCreate }) {
   const [title, setTitle] = useState("");
@@ -12,14 +13,16 @@ export default function CreateBoardModal({ user, onCreate }) {
     if (!title.trim()) return;
 
     try {
-      // Create the board
+       // Create the board and set both createdAt and updatedAt (so it sorts correctly)
       const boardRef = await addDoc(collection(db, "boards"), {
         title,
         ownerId: user.uid,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),   // ← important for immediate sort
+                        // initialize count
       });
 
-      // Add creator as collaborator
+      // Add creator as collaborator (owner)
       const collabRef = doc(db, "boards", boardRef.id, "collaborators", user.uid);
       await setDoc(collabRef, {
         id: user.uid,
@@ -28,6 +31,7 @@ export default function CreateBoardModal({ user, onCreate }) {
         boardTitle: title,
         ownerId: user.uid,
       });
+
 
       setTitle("");
       setIsOpen(false);
@@ -46,13 +50,53 @@ export default function CreateBoardModal({ user, onCreate }) {
 
   return (
     <>
-      {/* "+" button aligned next to title */}
-      <button
-        className="create-board-btn"
-        onClick={() => setIsOpen(true)}
-      >
-        +
-      </button>
+      
+      <div style={{
+                  position: 'fixed',
+                  bottom: '24px',
+                  right: '24px',
+                  zIndex: 1000, // stays above other content
+                  transition: 'opacity 0.4s ease',
+                  //opacity: modalIndex!=null ? 0 : (showFab ? 1 : 0), // hide when modal open
+                  //pointerEvents: modalIndex != null || !showFab ? 'none' : 'auto', // avoid blocking clicks when hidden
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
+              <button
+                onClick={() => setIsOpen(true)}
+                aria-label="Add Pick"
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  color: '#fff',
+                  border: 'none',
+                  width: '60px', // Set a fixed width
+                  height: '60px', // Set a fixed height
+                  borderRadius: '50%', // Make it circular
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 15px rgba(0,0,0,0.42)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center', // Center the icon
+                  backgroundColor: '#2e494a',
+                  border: '1px solid #4a6f70',
+                  outline: 'none',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease', // Add transition for smooth hover effects
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.42)';
+                }}
+              >
+                <FiPlus size={32} />
+                
+              </button>
+      
+              
+            </div>
 
       {/* Modal */}
       {isOpen && (

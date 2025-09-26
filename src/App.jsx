@@ -264,7 +264,7 @@ useEffect(() => {
       {!isBoardPage && (
         <div style={{ backgroundColor: '#1b999fff', padding: '12px 0', display: 'flex', alignItems: 'center', gap: '12px', position: 'fixed', left: 0, right: 0, top: 0, height: '45px', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
           <button onClick={() => setSidebarVisible(true)} style={{ fontSize: '24px', background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: '-12px' }}>☰</button>
-
+          
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit', flexGrow: 1 }}>
             <h2 style={{ margin: 0, fontFamily: "'Pacifico', cursive", fontSize: '1.8rem', color: '#151616ff' }}>PixPick</h2>
           </Link>
@@ -672,10 +672,9 @@ useEffect(() => {
             <>
               {/* your home: board list */}
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-                <h2 style={{ margin: 0, marginLeft: '12px' }}>{selected}</h2>
                 <CreateBoardModal user={user} onCreate={() => {}} />
               </div>
-              <BoardList user={user} selected={selected} boardsCache={boardsCache} setBoardsCache={setBoardsCache}/>
+              <BoardList user={user} selected={selected} setSelected={setSelected} boardsCache={boardsCache} setBoardsCache={setBoardsCache}/>
             </>
           } />
 

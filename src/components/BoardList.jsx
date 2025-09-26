@@ -1,19 +1,11 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  limit,
-  doc,
-  getDoc,
-} from "firebase/firestore";
-import { db } from "../firebase";
-import Loader from "../components/Loader"; // adjust path if needed
+import React, { useEffect, useRef, useState } from "react"; import { Link, useLocation, useNavigate } from "react-router-dom"; import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, } from "firebase/firestore"; import { db } from "../firebase"; import Loader from "../components/Loader";
+import { motion } from "framer-motion";
+import homeicon from '../assets/home.png';
+import sharedicon from '../assets/people_10498917.png';
 
-export default function BoardList({ user, boardsCache, setBoardsCache, selected }) {
+export default function BoardList({ user, boardsCache, setBoardsCache, selected, setSelected }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [boards, setBoards] = useState([]);
   const [latestboardimages, setLatestBoardImages] = useState({});
   const [loadingBoards, setLoadingBoards] = useState(false);
@@ -150,7 +142,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
             const isCollaborator = collabSnap.docs.some((c) => c.id === user.uid);
             const isOwner = boardData.ownerId === user.uid;
 
-            if (selected === "Shared with Me") {
+            if (selected === "Shared") {
               // include boards where user is a collaborator (but not owner)
               if (isCollaborator && !isOwner) {
                 setBoards((prev) => {
@@ -161,17 +153,12 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
               } else {
                 setBoards((prev) => prev.filter((b) => b.id !== boardId));
               }
-            } else if (selected === "All Boards") {
-              // include if owner or collaborator
-              if (isCollaborator || isOwner) {
-                setBoards((prev) => {
-                  const without = prev.filter((b) => b.id !== boardId);
-                  const next = [...without, boardData];
-                  return sortByRecency(next);
-                });
-              } else {
-                setBoards((prev) => prev.filter((b) => b.id !== boardId));
-              }
+            } else if(selected === "Notifications") {
+              navigate('/notifications'); 
+            } else if(selected === "Friends") {
+              navigate('/friends');
+            } else if(selected === "Home") {
+              setSelected('My Boards');
             }
             setLoadingBoards(false);
           }, (err) => {
@@ -206,7 +193,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, selected]);
 
-  // ---------- styles (unchanged but kept here) ----------
+    // ---------- styles (unchanged but kept here) ----------
   const boardItemStyle = {
     background:
       "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
@@ -348,13 +335,65 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
     );
   }
 
+  // ---------- UI styles ----------
+  const filterBarStyle = {
+    display: "flex",
+    justifyContent: "center",
+    gap: 16,
+    marginBottom: 16,
+  };
+
+  const filterBtn = (isActive) => ({
+    padding: "8px 16px",
+    borderRadius: "20px",
+    cursor: "pointer",
+    fontWeight: 500,
+    border: "none",
+    outline: "none",
+    background: isActive ? "#408083" : "#f2f2f2",
+    color: isActive ? "#fff" : "#333",
+    boxShadow: isActive ? "0 4px 10px rgba(0,0,0,0.15)" : "none",
+    transition: "all 0.2s ease",
+  });
+
   // ---------- Render ----------
   return (
     <div>
+      {/* Filter Tabs */}
+      <div style={filterBarStyle}>
+        {["My Boards", "Shared"].map((label) => (
+          <motion.button
+            key={label}
+            style={{...filterBtn(selected === label),
+              display: "flex",           // make button content a flex row
+              alignItems: "center",      // vertical centering
+              justifyContent: "center",  // optional: keep text centered if button is wide
+              gap: "0px", }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setSelected(label)}
+          >
+            {/* Conditionally render the correct icon based on the label */}
+            <img
+              src={label === "My Boards" ? homeicon : sharedicon}
+              alt={label === "My Boards" ? "Home Icon" : "Shared Icon"}
+              height={20}
+              width={20}
+              // Add a small margin to the right if you want space between the icon and text (recommended)
+               style={{ marginRight: '8px' }}
+            />
+            {/* Display the label text next to the icon */}
+            {label}
+          </motion.button>
+        ))}
+      </div>
+
       {/* Loader when switching views or initial load */}
       <Loader visible={loadingBoards} text={`Loading ${selected ? selected : "boards"}…`} />
 
-      {(!loadingBoards && boards.length === 0) ? <h4 style={{ textAlign: "center" }}>No boards found</h4> : null}
+      {(!loadingBoards && boards.length === 0) ? (
+        <h4 style={{ textAlign: "center", marginTop: 20 }}>No boards found</h4>
+      ) : null}
 
       <div style={gridStyle}>
         {boards.map((board) => {
@@ -377,11 +416,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
                 marginBottom: 0,
                 minHeight: SIZES.mainHeight + 40,
               }}
-              onMouseEnter={(e) => (
-                (e.currentTarget.style.transform = "translateY(-7px)"),
-                (e.currentTarget.style.boxShadow = "0 8px 8px rgba(16, 17, 17, 0.5)")
-              )}
-              onMouseLeave={(e) => ((e.currentTarget.style.transform = "translateY(0)"), (e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"))}
             >
               <strong>{board.title || "Untitled Board"}</strong>
 

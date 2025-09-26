@@ -4,6 +4,7 @@ import homeicon from '../assets/home.png';
 import sharedicon from '../assets/people_10498917.png';
 import bellicon from '../assets/bell.png';
 import friendsicon from '../assets/add-friend.png'; // 👉 add a simple icon (or use any placeholder)
+import {useLocation } from 'react-router-dom';
 
 export default function Sidebar({
   selected,
@@ -12,8 +13,10 @@ export default function Sidebar({
   user,
   width,
 }) {
-  const tabs = ['My Boards', 'Shared with Me'];
+  // These are the ones that show up in Sidebar
+  const tabs = [ 'Home', 'Notifications', 'Friends'];
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleTabClick = (tab) => {
     setSelected(tab);
@@ -23,6 +26,7 @@ export default function Sidebar({
 
   const iconMap = {
     'My Boards': homeicon,
+    'Home': homeicon,
     'Shared with Me': sharedicon,
     Notifications: bellicon,
     Friends: friendsicon,
@@ -30,8 +34,6 @@ export default function Sidebar({
 
   const ACCENT = '#1b999f';
   const ACCENT_DARK = '#16686e';
-  const BG = '#f6fbfc';
-  const CARD_BG = 'rgba(255,255,255,0.75)';
   const TEXT = '#1f2933';
 
   const initials = (name = '') =>
@@ -48,89 +50,7 @@ export default function Sidebar({
       }}
     >
       {/* Profile card */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-          padding: 10,
-          borderRadius: 16,
-          background: CARD_BG,
-          border: `1px solid rgba(27,153,159,0.2)`,
-          boxShadow: '0 8px 24px rgba(20,40,60,0.08)',
-          marginBottom: 20,
-          transition: 'transform 200ms ease, box-shadow 200ms ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow =
-            '0 12px 32px rgba(20,40,60,0.12)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = '';
-          e.currentTarget.style.boxShadow =
-            '0 8px 24px rgba(20,40,60,0.08)';
-        }}
-      >
-        {user?.photoURL ? (
-          <img
-            src={user.photoURL}
-            alt={user.displayName || 'User'}
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              objectFit: 'cover',
-              flexShrink: 0,
-              border: `2px solid ${ACCENT}`,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              background: `linear-gradient(135deg, ${ACCENT}20, ${ACCENT}10)`,
-              color: ACCENT_DARK,
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 700,
-              fontSize: 18,
-              border: `2px solid ${ACCENT}40`,
-            }}
-          >
-            {initials(user?.displayName)}
-          </div>
-        )}
 
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 700,
-              color: TEXT,
-              fontSize: 15,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {user?.displayName || 'Unnamed'}
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: '#56616a',
-              marginTop: 4,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user?.email}
-          </div>
-        </div>
-      </div>
 
       {/* Tabs */}
       <nav
@@ -138,13 +58,13 @@ export default function Sidebar({
         style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
       >
         {tabs.map((tab) => {
-          const isActive = selected === tab;
+          const isActive = (location.pathname === '/' && (tab === "Home" || tab === "My Boards"))
+               || (selected === tab);
           return (
             <div
               key={tab}
               role="button"
               tabIndex={0}
-              aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
               onKeyDown={(e) =>
                 e.key === 'Enter' ? handleTabClick(tab) : null
@@ -179,7 +99,7 @@ export default function Sidebar({
           );
         })}
       </nav>
-
+      {/* Divider */}
       <div
         style={{
           height: 1,
@@ -188,65 +108,6 @@ export default function Sidebar({
         }}
       />
 
-      {/* Notifications link */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          setSidebarVisible(false);
-          navigate('/notifications');
-        }}
-        onKeyDown={(e) =>
-          e.key === 'Enter'
-            ? (setSidebarVisible(false), navigate('/notifications'))
-            : null
-        }
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '10px 12px',
-          borderRadius: 12,
-          cursor: 'pointer',
-          transition: 'background 160ms ease, transform 160ms ease',
-        }}
-      >
-        <img src={bellicon} alt="Notifications" style={{ width: 22, height: 22 }} />
-        <div style={{ fontSize: 15, color: TEXT, fontWeight: 600 }}>
-          Notifications
-        </div>
-        
-      </div>
-
-      {/* Friends link */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          setSidebarVisible(false);
-          navigate('/friends');
-        }}
-        onKeyDown={(e) =>
-          e.key === 'Enter'
-            ? (setSidebarVisible(false), navigate('/friends'))
-            : null
-        }
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '10px 12px',
-          borderRadius: 12,
-          cursor: 'pointer',
-          marginTop: 10,
-          transition: 'background 160ms ease, transform 160ms ease',
-        }}
-      >
-        <img src={friendsicon} alt="Friends" style={{ width: 22, height: 22 }} />
-        <div style={{ fontSize: 15, color: TEXT, fontWeight: 600 }}>
-          Friends
-        </div>
-      </div>
     </div>
   );
 }
