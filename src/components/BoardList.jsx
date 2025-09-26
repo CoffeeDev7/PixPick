@@ -1,35 +1,64 @@
-import React, { useState, useEffect } from "react";
-import { Link , useLocation } from "react-router-dom";
-import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  limit,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../firebase";
+import Loader from "../components/Loader"; // adjust path if needed
 
 export default function BoardList({ user, boardsCache, setBoardsCache, selected }) {
   const location = useLocation();
   const [boards, setBoards] = useState([]);
   const [latestboardimages, setLatestBoardImages] = useState({});
-  const [viewMode, setViewMode] = useState("wide");
+  const [loadingBoards, setLoadingBoards] = useState(false);
 
-  // ---------- existing listeners (unchanged) ----------
+  // refs for cleanup of per-board collaborator listeners
+  const collabUnsubsRef = useRef(new Map());
+  const boardCollectionUnsubRef = useRef(null);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    if (!user || boardsCache.length > 0) return;
-    const unsub = onSnapshot(collection(db, "boards"), (snap) => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // ---------- initial board cache listener (only to populate cache once) ----------
+  useEffect(() => {
+    if (!user || (boardsCache && boardsCache.length > 0)) return;
+
+    // single snapshot to populate cache (we keep live listener below for selection)
+    const q = query(collection(db, "boards"));
+    const unsub = onSnapshot(q, (snap) => {
       const temp = [];
-      snap.forEach((doc) => {
-        const data = { id: doc.id, ...doc.data() };
+      snap.forEach((d) => {
+        const data = { id: d.id, ...d.data() };
         if (data.ownerId === user.uid) temp.push(data);
       });
       setBoardsCache(temp);
     });
+
     return () => unsub();
   }, [user, boardsCache, setBoardsCache]);
 
+  // Keep local boards state in sync with boardsCache when provided
   useEffect(() => {
-    if (boardsCache.length > 0) setBoards(boardsCache);
+    if (boardsCache && boardsCache.length > 0) {
+      setBoards(boardsCache);
+    }
   }, [boardsCache]);
 
+  // ---------- latest images per board (3 most recent) ----------
+  // listense to images subcollections for boards currently in `boards`
   useEffect(() => {
     if (!user) return;
     const unsubs = [];
+
     boards.forEach((board) => {
       const qImg = query(
         collection(db, "boards", board.id, "images"),
@@ -37,88 +66,147 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
         limit(3)
       );
       const unsub = onSnapshot(qImg, (snap) => {
+        // if component unmounted, ignore
+        if (!mountedRef.current) return;
         const imgs = snap.docs.map((d) => d.data().src || "");
         setLatestBoardImages((prev) => ({ ...prev, [board.id]: imgs }));
+      }, (err) => {
+        console.warn("latest images listener error for board", board.id, err);
       });
       unsubs.push(unsub);
     });
+
     return () => unsubs.forEach((u) => u());
   }, [user, boards]);
 
+  // ---------- main boards listener (reacts to selected filter and keeps up-to-date) ----------
   useEffect(() => {
     if (!user) return;
-    let boardUnsub = null;
-    const collabUnsubs = new Map();
 
-    const startListening = () => {
-      boardUnsub = onSnapshot(collection(db, "boards"), (boardsSnap) => {
-        const tempBoards = [];
-        boardsSnap.forEach((boardDoc) => {
-          const boardData = { id: boardDoc.id, ...boardDoc.data() };
-          if (selected === "My Boards") {
-            if (boardData.ownerId === user.uid) tempBoards.push(boardData);
-          } else if (selected === "Shared with Me") {
-            if (!collabUnsubs.has(boardDoc.id)) {
-              const unsub = onSnapshot(
-                collection(db, "boards", boardDoc.id, "collaborators"),
-                (collabSnap) => {
-                  const isCollaborator = collabSnap.docs.some(
-                    (c) => c.id === user.uid && c.data().role !== "owner"
-                  );
-                  if (isCollaborator) {
-                    setBoards((prev) => {
-                      const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
-                      return [...withoutBoard, boardData].sort(
-                        (a, b) =>
-                          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-                      );
-                    });
-                  } else {
-                    setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
-                  }
-                }
-              );
-              collabUnsubs.set(boardDoc.id, unsub);
-            }
-          } else if (selected === "All Boards") {
-            if (boardData.ownerId === user.uid) tempBoards.push(boardData);
-            if (!collabUnsubs.has(boardDoc.id)) {
-              const unsub = onSnapshot(
-                collection(db, "boards", boardDoc.id, "collaborators"),
-                (collabSnap) => {
-                  const isCollaborator = collabSnap.docs.some((c) => c.id === user.uid);
-                  if (isCollaborator || boardData.ownerId === user.uid) {
-                    setBoards((prev) => {
-                      const withoutBoard = prev.filter((b) => b.id !== boardDoc.id);
-                      return [...withoutBoard, boardData].sort(
-                        (a, b) =>
-                          (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-                      );
-                    });
-                  } else {
-                    setBoards((prev) => prev.filter((b) => b.id !== boardDoc.id));
-                  }
-                }
-              );
-              collabUnsubs.set(boardDoc.id, unsub);
-            }
-          }
+    // show loader when switching selection
+    setLoadingBoards(true);
+
+    // cleanup any previous per-board collab listeners
+    collabUnsubsRef.current.forEach((u) => u());
+    collabUnsubsRef.current.clear();
+
+    // ensure we cleanup previous board collection unsub
+    if (boardCollectionUnsubRef.current) {
+      boardCollectionUnsubRef.current();
+      boardCollectionUnsubRef.current = null;
+    }
+
+    // We try to order by updatedAt on server to get sensible ordering immediately.
+    // Fallback to client-side sorting by updatedAt||createdAt in case some docs
+    // are missing updatedAt.
+    const qBoards = query(collection(db, "boards"), orderBy("updatedAt", "desc"));
+    const boardUnsub = onSnapshot(qBoards, async (boardsSnap) => {
+      if (!mountedRef.current) return;
+
+      // collect boards depending on the selected filter
+      const tempBoards = [];
+
+      // We'll build a list of candidate boards and then apply filters:
+      const candidateBoards = [];
+      boardsSnap.forEach((boardDoc) => {
+        candidateBoards.push({ id: boardDoc.id, ...boardDoc.data() });
+      });
+
+      // Helper to sort by updatedAt or createdAt
+      const sortByRecency = (arr) =>
+        arr.sort((a, b) => {
+          const aTs = (a.updatedAt?.seconds ?? a.updatedAt?.toMillis?.() ?? a.createdAt?.seconds ?? 0);
+          const bTs = (b.updatedAt?.seconds ?? b.updatedAt?.toMillis?.() ?? b.createdAt?.seconds ?? 0);
+          return bTs - aTs;
         });
 
-        if (selected === "My Boards") {
-          setBoards(tempBoards.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      if (selected === "My Boards") {
+        // only boards owned by me
+        for (const bd of candidateBoards) {
+          if (bd.ownerId === user.uid) tempBoards.push(bd);
         }
-      });
-    };
+        setBoards(sortByRecency(tempBoards));
+        setLoadingBoards(false);
+      } else {
+        // For Shared with Me or All Boards we will set per-board collaborator listeners
+        // For performance we don't create duplicate listeners (collabUnsubsRef guards this)
+        // Also we maintain `boards` via setBoards when a collaborator entry indicates the user is part of it.
 
-    startListening();
+        // Start with clearing boards for this view
+        setBoards([]);
+
+        // We'll iterate through candidateBoards and for each board create a collaborator snapshot
+        // That snapshot will decide whether to include the board in the `boards` state.
+        candidateBoards.forEach((boardData) => {
+          const boardId = boardData.id;
+
+          // If we already have a listener for this board, skip
+          if (collabUnsubsRef.current.has(boardId)) return;
+
+          const collabQ = collection(db, "boards", boardId, "collaborators");
+          const unsub = onSnapshot(collabQ, (collabSnap) => {
+            if (!mountedRef.current) return;
+
+            const isCollaborator = collabSnap.docs.some((c) => c.id === user.uid);
+            const isOwner = boardData.ownerId === user.uid;
+
+            if (selected === "Shared with Me") {
+              // include boards where user is a collaborator (but not owner)
+              if (isCollaborator && !isOwner) {
+                setBoards((prev) => {
+                  const without = prev.filter((b) => b.id !== boardId);
+                  const next = [...without, boardData];
+                  return sortByRecency(next);
+                });
+              } else {
+                setBoards((prev) => prev.filter((b) => b.id !== boardId));
+              }
+            } else if (selected === "All Boards") {
+              // include if owner or collaborator
+              if (isCollaborator || isOwner) {
+                setBoards((prev) => {
+                  const without = prev.filter((b) => b.id !== boardId);
+                  const next = [...without, boardData];
+                  return sortByRecency(next);
+                });
+              } else {
+                setBoards((prev) => prev.filter((b) => b.id !== boardId));
+              }
+            }
+            setLoadingBoards(false);
+          }, (err) => {
+            console.warn("collab listener error", boardId, err);
+            setLoadingBoards(false);
+          });
+
+          collabUnsubsRef.current.set(boardId, unsub);
+        });
+
+        // If there were zero candidate boards, hide loader
+        if (candidateBoards.length === 0) {
+          setLoadingBoards(false);
+        }
+      }
+    }, (err) => {
+      console.warn("boards collection listener error", err);
+      setLoadingBoards(false);
+    });
+
+    boardCollectionUnsubRef.current = boardUnsub;
+
     return () => {
-      if (boardUnsub) boardUnsub();
-      collabUnsubs.forEach((unsub) => unsub());
+      // cleanup
+      if (boardCollectionUnsubRef.current) {
+        boardCollectionUnsubRef.current();
+        boardCollectionUnsubRef.current = null;
+      }
+      collabUnsubsRef.current.forEach((u) => u());
+      collabUnsubsRef.current.clear();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, selected]);
 
-  // ---------- styles you already had ----------
+  // ---------- styles (unchanged but kept here) ----------
   const boardItemStyle = {
     background:
       "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
@@ -144,7 +232,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   };
 
   // ---------- Responsive grid logic ----------
-  // decide columns based on window width
   function useWindowSize() {
     const [size, setSize] = useState({
       width: typeof window !== "undefined" ? window.innerWidth : 1200,
@@ -160,19 +247,18 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
 
   const { width } = useWindowSize();
 
-  // breakpoints — tweak these if you like
   const getColumns = () => {
-    if (width < 640) return 1; // mobile
-    if (width < 900) return 2; // small tablet
-    if (width < 1200) return 3; // laptop
-    return 4; // large desktop
+    if (width < 640) return 1;
+    if (width < 900) return 2;
+    if (width < 1200) return 3;
+    return 4;
   };
 
-  const columns = getColumns();
+  const columnsCount = getColumns();
 
   const gridStyle = {
     display: "grid",
-    gridTemplateColumns: `repeat(${columns}, 1fr)`,
+    gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
     gap: 12,
     alignItems: "start",
     background: "linear-gradient(to right top, #408083, #408083, #408083, #408083, #408083)",
@@ -181,12 +267,10 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   };
 
   // ---------- Card sizing that scales inside each grid cell ----------
-  // We switched main/preview to percentage widths so they scale inside each grid cell.
   const SIZES = {
-    // tweak these percentages to change visual proportions inside card
-    mainPercent: 0.62, // main image gets ~62% of the card width
+    mainPercent: 0.62,
     previewPercent: 0.38,
-    mainHeight: 180, // px height for the visual. Change to suit your design.
+    mainHeight: 180,
     gap: 8,
   };
 
@@ -227,10 +311,15 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
 
   const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
 
-  // BoardCard identical to before but adapted to percent widths (so it scales in grid)
+  // BoardCard identical adapted to percent widths
   function BoardCard({ board, imgs }) {
     const initial = [imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder];
     const [cardImgs, setCardImgs] = useState(initial);
+
+    useEffect(() => {
+      // if imgs change (new picture added), update the preview thumbnails immediately
+      setCardImgs([imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder]);
+    }, [imgs]);
 
     const onPreviewClick = (previewIndex) => {
       const newImgs = [...cardImgs];
@@ -262,9 +351,11 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
   // ---------- Render ----------
   return (
     <div>
-      {boards.length === 0 ? <h4 style={{ textAlign: "center" }}>No boards found</h4> : null}
+      {/* Loader when switching views or initial load */}
+      <Loader visible={loadingBoards} text={`Loading ${selected ? selected : "boards"}…`} />
 
-      {/* Grid container: responsive columns */}
+      {(!loadingBoards && boards.length === 0) ? <h4 style={{ textAlign: "center" }}>No boards found</h4> : null}
+
       <div style={gridStyle}>
         {boards.map((board) => {
           const imgs = latestboardimages[board.id] || [];
@@ -273,7 +364,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
             <Link
               key={board.id}
               to={to}
-              state={{ background: location }} //  <<< important , pass current location in state 
+              state={{ background: location }}
               style={{
                 ...boardItemStyle,
                 display: "block",
@@ -283,18 +374,17 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected 
                 textDecoration: "none",
                 color: "inherit",
                 overflow: "hidden",
-                marginBottom: 0, // grid manages spacing
+                marginBottom: 0,
                 minHeight: SIZES.mainHeight + 40,
               }}
               onMouseEnter={(e) => (
-                e.currentTarget.style.transform = "translateY(-7px)",
-                e.currentTarget.style.boxShadow = "0 8px 8px rgba(16, 17, 17, 0.5)"
+                (e.currentTarget.style.transform = "translateY(-7px)"),
+                (e.currentTarget.style.boxShadow = "0 8px 8px rgba(16, 17, 17, 0.5)")
               )}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)", e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)")}
+              onMouseLeave={(e) => ((e.currentTarget.style.transform = "translateY(0)"), (e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"))}
             >
               <strong>{board.title || "Untitled Board"}</strong>
 
-              {/* card cover (main-left, previews-right) */}
               <div style={{ marginTop: 8 }}>
                 <BoardCard board={board} imgs={imgs} />
               </div>
