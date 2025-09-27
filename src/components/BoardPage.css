@@ -256,7 +256,7 @@
 }
 
 .onhoverbggrey:hover {
-  background: #777b7e; /* grey on hover */
+  background: rgba(0,0,0,0.06); /* grey on hover */
 }
 
 .onhoverbggrey.active {

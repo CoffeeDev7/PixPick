@@ -551,8 +551,15 @@ const handleDeleteBoard = async (boardIdParam) => {
             if (!turningOn) clearSelection();
           }}
           title={multiSelectMode ? "Exit select mode" : "Select multiple picks"}
-          className="onhoverbggrey"
-          style={{ marginRight: 6 }}
+          style={{
+                background: selectedImages.size > 0 ? '#4dabeeff' : 'transparent',
+                color: selectedImages.size > 0 ? '#efefef' : '#333',
+                border: 'none',
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
         >
           {multiSelectMode ? 'Cancel' : 'Select'}
         </button>
@@ -561,8 +568,15 @@ const handleDeleteBoard = async (boardIdParam) => {
           <>
             <button
               onClick={() => selectedImages.size === images.length ? clearSelection() : selectAllImages()}
-              className="onhoverbggrey"
-              style={{ marginRight: 6 }}
+              
+              style={{
+                background: selectedImages.size > 0 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
+                color: selectedImages.size > 0 ? '#efefef' : '#666',
+                border: 'none',
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer' ,
+              }}
             >
               {selectedImages.size === images.length ? 'Clear' : 'Select all'}
             </button>
@@ -572,11 +586,11 @@ const handleDeleteBoard = async (boardIdParam) => {
               disabled={selectedImages.size === 0 || bulkDeleting}
               style={{
                 background: selectedImages.size > 0 ? '#ee6c4d' : 'rgba(0,0,0,0.06)',
-                color: selectedImages.size > 0 ? '#fff' : '#666',
+                color: selectedImages.size > 0 ? '#efefef' : '#666',
                 border: 'none',
                 padding: '8px 10px',
                 borderRadius: 8,
-                cursor: selectedImages.size > 0 && !bulkDeleting ? 'pointer' : 'not-allowed'
+                cursor: 'pointer'
               }}
               title="Delete selected picks"
             >
