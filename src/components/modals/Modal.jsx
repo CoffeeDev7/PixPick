@@ -4,7 +4,7 @@ import commenticon from '../../assets/comment-add-svgrepo-com.svg';
 import rotateicon from '../../assets/rotate-cw-svgrepo-com.svg';
 import infoicon from '../../assets/info-svgrepo-com.svg';
 
-// InfoModal unchanged (kept as you provided)
+// InfoModal (unchanged)
 export const InfoModal = ({ open, onClose, image }) => {
   if (!open) return null;
 
@@ -19,9 +19,9 @@ export const InfoModal = ({ open, onClose, image }) => {
   }
 
   return (
-    <div onClick={onClose} style={{ borderRadius: "16px", padding: "20px", width: "320px", maxWidth: "90%", boxShadow: "0 6px 20px rgba(0,0,0,0.4)", maxHeight: "80vh" }}>
-      <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", width: "320px", maxWidth: "90%", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" }}>
-        <h2 style={{ marginTop: 0, marginBottom: "12px", fontSize: "18px" }}>Image Info</h2>
+    <div onClick={onClose} style={{ borderRadius: 16, padding: 20, width: 320, maxWidth: "90%", boxShadow: "0 6px 20px rgba(0,0,0,0.4)", maxHeight: "80vh" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 20, width: 320, maxWidth: "90%", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" }}>
+        <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 18 }}>Image Info</h2>
         <p><strong>Title:</strong> {image?.title || "Mock Title"}</p>
         <p><strong>Uploaded By:</strong> {image?.user || "John Doe"}</p>
         <p><strong>Date:</strong>{" "}
@@ -40,7 +40,7 @@ export const InfoModal = ({ open, onClose, image }) => {
             : "Unknown"}
         </p>
 
-        <button onClick={onClose} style={{ marginTop: "16px", padding: "8px 12px", border: "none", borderRadius: 999, background: "linear-gradient(90deg, rgba(27,153,159,0.95), rgba(43,95,168,0.95))", color: "#fff", cursor: "pointer" }}>
+        <button onClick={onClose} style={{ marginTop: 16, padding: "8px 12px", border: "none", borderRadius: 999, background: "linear-gradient(90deg, rgba(27,153,159,0.95), rgba(43,95,168,0.95))", color: "#fff", cursor: "pointer" }}>
           Close
         </button>
       </div>
@@ -49,17 +49,18 @@ export const InfoModal = ({ open, onClose, image }) => {
 };
 
 const ImageModal = ({
-  images,
+  images = [],
   modalIndex,
   setModalIndex,
-  commentCounts,
-  openCommentsForIndex,
-  handleDeleteImage,
-  settings,
+  commentCounts = {},
+  openCommentsForIndex = () => {},
+  handleDeleteImage = () => {},
+  settings = { animateEnabled: true },
 }) => {
   if (modalIndex === null) return null;
   const [infoOpen, setInfoOpen] = React.useState(false);
 
+  // refs + state
   const touchStartX = React.useRef(null);
   const touchEndX = React.useRef(null);
   const [showOverflow, setShowOverflow] = React.useState(false);
@@ -69,22 +70,18 @@ const ImageModal = ({
   const hideTimerRef = React.useRef(null);
   const [rotationIdx, setRotationIdx] = React.useState(0);
 
-  const clearHideTimer = () => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  };
-  const VISIBILITY_MS = 3500;
-  const scheduleHide = () => {
-    if (manualOpen) return;
-    clearHideTimer();
-    hideTimerRef.current = setTimeout(() => {
-      setShowToolbar(false);
-      hideTimerRef.current = null;
-    }, VISIBILITY_MS);
-  };
+  // animation guard
+  const isAnimatingRef = React.useRef(false);
 
+  // prev index ref used to deterministically derive direction
+  const prevIndexRef = React.useRef(modalIndex);
+
+  // update prevIndexRef after render so during next render it's the previous value
+  React.useEffect(() => {
+    prevIndexRef.current = modalIndex;
+  }, [modalIndex]);
+
+  // cleanup timer
   React.useEffect(() => {
     return () => {
       if (hideTimerRef.current) {
@@ -94,6 +91,7 @@ const ImageModal = ({
     };
   }, []);
 
+  // hover detection
   React.useEffect(() => {
     let mq;
     const check = () => {
@@ -128,105 +126,89 @@ const ImageModal = ({
   const rotationDeg = rotationIdx * 90;
   const rotateImage = () => setRotationIdx((r) => r + 1);
 
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+  const VISIBILITY_MS = 3500;
+  const scheduleHide = () => {
+    if (manualOpen) return;
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      setShowToolbar(false);
+      hideTimerRef.current = null;
+    }, VISIBILITY_MS);
+  };
+
+  // minimal direction calc (handles wrap-around)
+  const calcDir = (prev, curr, len) => {
+    if (prev == null || prev === curr) return 1;
+    // wrap cases
+    if (prev === 0 && curr === len - 1) return -1;
+    if (prev === len - 1 && curr === 0) return 1;
+    return curr > prev ? 1 : -1;
+  };
+  const derivedDir = calcDir(prevIndexRef.current, modalIndex, images.length);
+
+  // navigation helpers (guarded by isAnimatingRef)
   const prevImage = (e) => {
-  if (e) e.stopPropagation();
-  if (isAnimatingRef.current) return;
-  directionRef.current = -1;
-  setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-};
-
-const nextImage = (e) => {
-  if (e) e.stopPropagation();
-  if (isAnimatingRef.current) return;
-  directionRef.current = 1;
-  setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-};
-
-  const toggleOverflow = (e) => {
-    e.stopPropagation();
-    const next = !manualOpen;
-    setManualOpen(next);
-    setShowToolbar(next);
-    if (!next) clearHideTimer();
-    else clearHideTimer();
+    if (e) e.stopPropagation();
+    if (isAnimatingRef.current) return;
+    setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
-  const onBackdropClick = () => {
-    setManualOpen(false);
-    setShowToolbar(false);
-    setModalIndex(null);
+  const nextImage = (e) => {
+    if (e) e.stopPropagation();
+    if (isAnimatingRef.current) return;
+    setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  // Touch handlers
+  // keyboard handlers (use prev/next helpers so guard is centralized)
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (modalIndex === null || isAnimatingRef.current) return;
+
+      if (e.key === "ArrowLeft") {
+        prevImage();
+      } else if (e.key === "ArrowRight") {
+        nextImage();
+      } else if (e.key === "Escape") {
+        setModalIndex(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalIndex, images.length]);
+
+  // touch handlers
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
   };
   const handleTouchMove = (e) => {
     touchEndX.current = e.touches[0].clientX;
   };
-// --- update handleTouchEnd to also respect isAnimatingRef and set direction BEFORE state ---
-const handleTouchEnd = () => {
-  if (isAnimatingRef.current) {
+  const handleTouchEnd = () => {
+    if (isAnimatingRef.current) {
+      touchStartX.current = null;
+      touchEndX.current = null;
+      return;
+    }
+    if (touchStartX.current !== null && touchEndX.current !== null) {
+      const delta = touchEndX.current - touchStartX.current;
+      const threshold = 40;
+      if (delta > threshold) {
+        prevImage();
+      } else if (delta < -threshold) {
+        nextImage();
+      }
+    }
     touchStartX.current = null;
     touchEndX.current = null;
-    return;
-  }
-
-  if (touchStartX.current !== null && touchEndX.current !== null) {
-    const delta = touchEndX.current - touchStartX.current;
-    const threshold = 40;
-
-    if (delta > threshold) {
-      // swipe right => previous
-      directionRef.current = -1;
-      setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-    } else if (delta < -threshold) {
-      // swipe left => next
-      directionRef.current = 1;
-      setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    }
-  }
-
-  touchStartX.current = null;
-  touchEndX.current = null;
-};
-
-
-
-  // --- replace keyboard useEffect with this (sets direction FIRST) ---
-React.useEffect(() => {
-  const handleKeyDown = (e) => {
-    if (modalIndex === null || isAnimatingRef.current) return;
-
-    if (e.key === "ArrowLeft") {
-      directionRef.current = -1;
-      setModalIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-    } else if (e.key === "ArrowRight") {
-      directionRef.current = 1;
-      setModalIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    } else if (e.key === "Escape") {
-      setModalIndex(null);
-    }
   };
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
-}, [modalIndex, images.length]);
 
-  // direction: +1 = next (slide left), -1 = prev (slide right)
-  // derive direction from last user action by storing it in ref when changing index
-  const directionRef = React.useRef(1);
-  // --- add this ref near other refs ---
-  const isAnimatingRef = React.useRef(false);
-  React.useEffect(() => {
-    // whenever modalIndex changes we assume directionRef already set by prev/next handlers
-    // (we set it below in onClick handlers)
-  }, [modalIndex]);
-
-  // When user clicks prev/next we updated directionRef; ensure our prev/next update it:
-  const handlePrev = (e) => { if (e) e.stopPropagation(); directionRef.current = -1; prevImage(e); };
-  const handleNext = (e) => { if (e) e.stopPropagation(); directionRef.current = 1; nextImage(e); };
-
-  // === motion variants for entering/exiting ===
+  // motion variants
   const imageVariants = {
     enter: ({ dir }) => ({
       opacity: 0,
@@ -234,7 +216,7 @@ React.useEffect(() => {
       scale: 0.986,
       transition: {
         type: "spring",
-        stiffness:60,
+        stiffness: 60,
         damping: 34,
         mass: 0.6,
       },
@@ -250,7 +232,6 @@ React.useEffect(() => {
         damping: 30,
         mass: 0.8,
       },
-      // rotation is handled on the inner <img> (so variants don't fight transforms)
     }),
     exit: ({ dir }) => ({
       opacity: 0,
@@ -265,11 +246,18 @@ React.useEffect(() => {
     }),
   };
 
-  // style for fade toolbar
+  // toolbar fade helper
   const toolbarFadeStyle = {
     opacity: showToolbar ? 1 : 0,
     transition: "opacity 180ms ease",
     pointerEvents: showToolbar ? "auto" : "none",
+  };
+
+  // click outside/backdrop behavior
+  const onBackdropClick = () => {
+    setManualOpen(false);
+    setShowToolbar(false);
+    setModalIndex(null);
   };
 
   return (
@@ -296,7 +284,6 @@ React.useEffect(() => {
         style={{
           position: "relative",
           display: "inline-block",
-          // a predictable container so that animated children don't jump around
           width: "min(90vw, 1200px)",
           height: "min(90vh, 800px)",
         }}
@@ -304,19 +291,25 @@ React.useEffect(() => {
         onMouseEnter={() => setShowOverflow(true)}
         onMouseLeave={() => setShowOverflow(false)}
       >
-        {/* AnimatePresence wraps a motion.div container per image.
-            We set key=modalIndex so switching index mounts/unmounts the motion.div */}
-            {console.log('settings in modal:', settings)}
-            {console.log('settings.animateEnabled:', settings?.animateEnabled)}
-        {settings.animateEnabled ? (
-          <AnimatePresence initial={false} custom={{ dir: directionRef.current, rotation: rotationDeg }}>
+        {/* Use AnimatePresence only when animations are enabled */}
+        {settings?.animateEnabled ? (
+          <AnimatePresence initial={false} custom={{ dir: derivedDir, rotation: rotationDeg }}>
             <motion.div
-              key={currentImage?.id ?? modalIndex}            // use stable id if available
-              custom={{ dir: directionRef.current, rotation: rotationDeg }}
+              key={currentImage?.id ?? modalIndex}
+              custom={{ dir: derivedDir, rotation: rotationDeg }}
               variants={imageVariants}
               initial="enter"
               animate="center"
               exit="exit"
+              onAnimationStart={() => {
+                isAnimatingRef.current = true;
+              }}
+              onAnimationComplete={() => {
+                // microtask delay ensures exit/enter ordering clears properly
+                setTimeout(() => {
+                  isAnimatingRef.current = false;
+                }, 0);
+              }}
               style={{
                 position: "absolute",
                 top: 0,
@@ -329,11 +322,9 @@ React.useEffect(() => {
                 justifyContent: "center",
                 zIndex: 1000,
                 pointerEvents: "auto",
-                objectFit: "contain",
               }}
               onClick={() => setModalIndex(null)}
             >
-              {/* Inner image is purely rotated by CSS so framer's translate/opacity doesn't fight rotate */}
               <img
                 src={currentImage?.src}
                 alt="Full view"
@@ -342,7 +333,7 @@ React.useEffect(() => {
                   maxWidth: "100%",
                   maxHeight: "100%",
                   cursor: "pointer",
-                  borderRadius: "8px",
+                  borderRadius: 8,
                   boxShadow: "0 0 20px rgba(0,0,0,0.4)",
                   userSelect: "none",
                   transform: `rotate(${rotationDeg}deg)`,
@@ -352,43 +343,45 @@ React.useEffect(() => {
                 onClick={() => setModalIndex(null)}
               />
             </motion.div>
-        </AnimatePresence>) :
-         ( <div
+          </AnimatePresence>
+        ) : (
+          // when animations are disabled, render plain div for instant swaps
+          <div
+            key={currentImage?.id ?? modalIndex}
             style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                margin: "auto",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 1000,
-                pointerEvents: "auto",
-              }}
-              onClick={() => setModalIndex(null)}>
-                
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              margin: "auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              pointerEvents: "auto",
+            }}
+            onClick={() => setModalIndex(null)}
+          >
             <img
-                src={currentImage?.src}
-                alt="Full view"
-                style={{
-                  display: "block",
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  cursor: "pointer",
-                  borderRadius: "8px",
-                  boxShadow: "0 0 20px rgba(0,0,0,0.4)",
-                  userSelect: "none",
-                  transform: `rotate(${rotationDeg}deg)`,
-                  transition: "transform 300ms ease",
-                }}
-                draggable={false}
-                onClick={() => setModalIndex(null)}
-              />
+              src={currentImage?.src}
+              alt="Full view"
+              style={{
+                display: "block",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                cursor: "pointer",
+                borderRadius: 8,
+                boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+                userSelect: "none",
+                transform: `rotate(${rotationDeg}deg)`,
+                // avoid extra transition when animations disabled
+              }}
+              draggable={false}
+              onClick={() => setModalIndex(null)}
+            />
           </div>
         )}
-        
 
         {/* Overflow button */}
         <div
@@ -412,7 +405,10 @@ React.useEffect(() => {
             title="More"
             onClick={(e) => {
               e.stopPropagation();
-              toggleOverflow(e);
+              const next = !manualOpen;
+              setManualOpen(next);
+              setShowToolbar(next);
+              if (!next) clearHideTimer();
             }}
             onTouchStart={(e) => e.stopPropagation()}
             style={{
@@ -475,14 +471,6 @@ React.useEffect(() => {
               transition: "transform .12s ease, box-shadow .12s ease, background .12s ease",
               outline: "none",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-3px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
           >
             <img width="18" height="18" src={rotateicon} alt="rotate" />
           </button>
@@ -507,14 +495,6 @@ React.useEffect(() => {
               cursor: "pointer",
               transition: "transform .12s ease, box-shadow .12s ease, background .12s ease",
               outline: "none",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-3px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
             }}
           >
             <img width="18" height="18" src={infoicon} alt="info" />
@@ -543,14 +523,6 @@ React.useEffect(() => {
               transform: "translateZ(0)",
               transition: "transform .12s ease, box-shadow .12s ease",
               outline: "none",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-3px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
             }}
           >
             <img width="18" height="18" src={commenticon} alt="comments" />
@@ -581,14 +553,6 @@ React.useEffect(() => {
               transition: "transform .12s ease, box-shadow .12s ease",
               outline: "none",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-3px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6" />
@@ -600,11 +564,11 @@ React.useEffect(() => {
           </button>
         </div>
 
-        {/* Arrow Buttons (use handlePrev/handleNext so directionRef updates) */}
+        {/* Arrow Buttons */}
         <button
           aria-label="Previous image"
-          onClick={(e) => { directionRef.current = -1; prevImage(e); }}
-          onTouchStart={(e) => { e.stopPropagation(); directionRef.current = -1; prevImage(); }}
+          onClick={(e) => { e.stopPropagation(); prevImage(e); }}
+          onTouchStart={(e) => { e.stopPropagation(); prevImage(); }}
           style={{
             position: "absolute",
             left: 8,
@@ -626,8 +590,6 @@ React.useEffect(() => {
             outline: "none",
             backdropFilter: "blur(4px)",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.transform = 'translateY(-50%) translateX(-4px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.4; e.currentTarget.style.transform = 'translateY(-50%)'; }}
         >
           <svg width="18" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <polyline points="15 18 9 12 15 6" />
@@ -636,8 +598,8 @@ React.useEffect(() => {
 
         <button
           aria-label="Next image"
-          onClick={(e) => { directionRef.current = 1; nextImage(e); }}
-          onTouchStart={(e) => { e.stopPropagation(); directionRef.current = 1; nextImage(); }}
+          onClick={(e) => { e.stopPropagation(); nextImage(e); }}
+          onTouchStart={(e) => { e.stopPropagation(); nextImage(); }}
           style={{
             position: "absolute",
             right: 8,
@@ -659,8 +621,6 @@ React.useEffect(() => {
             outline: "none",
             backdropFilter: "blur(4px)",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.transform = 'translateY(-50%) translateX(-4px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.4; e.currentTarget.style.transform = 'translateY(-50%)'; }}
         >
           <svg width="18" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <polyline points="9 18 15 12 9 6" />
