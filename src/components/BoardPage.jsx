@@ -16,19 +16,20 @@ import CollaboratorsModal from './modals/CollaboratorsModal';
 import { supabase } from "../lib/supabase";
 import PasteBox from './PasteBox';
 import {
-  useBoardAndCollaborators,
-  useCollaboratorProfiles,
-  useImagesSubscription,
-  useCommentCounts,
-  useBoardCommentsCount,
-  useDeepLinkImageOpen,
-  useModalKeyboardNavigation,
-  useEscapeToExit,
-  useMountLogger,
-  useOutsideClick,
-  useFetchBoardTitle,
+  useBoardAndCollaborators, useCollaboratorProfiles,  useImagesSubscription,  useCommentCounts,
+  useBoardCommentsCount,  useDeepLinkImageOpen,  useModalKeyboardNavigation,  useEscapeToExit,
+  useMountLogger,  useOutsideClick,  useFetchBoardTitle,
 } from '../hooks/BoardPage.hooks';
 import Loader from './Loader';
+import { SettingsModal } from './modals/SettingsModal';
+
+// Default settings
+const defaultSettings = {
+  animateEnabled: true,
+  showCaptions: true,
+  darkMode: false,
+  // add more variables here as needed
+};
 
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
@@ -36,6 +37,12 @@ export default function BoardPage({ user }) {
   const location = useLocation();
   const menuRef = useRef(null);
   
+  // Load settings from localStorage, fallback to defaultSettings
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem("boardSettings");
+    return saved ? JSON.parse(saved) : defaultSettings;
+  });
+
   // multi-select state
 const [multiSelectMode, setMultiSelectMode] = useState(false);
 const [selectedImages, setSelectedImages] = useState(new Set()); // Set of image ids
@@ -61,7 +68,7 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const [commentText, setCommentText] = useState('');
   const commentsUnsubRef = useRef(null);
 
-  const [settingsmodal, setSettingsmodal] = useState(false);
+  const [open, setOpen] = useState(false);
 
   // board-level comments (small button beside 3-dots)
   const [boardCommentModalOpen, setBoardCommentModalOpen] = useState(false);
@@ -100,6 +107,11 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const { boardTitle, lastOpenedShort, setLastOpenedShort } = useFetchBoardTitle(boardId);
   const { setBoardTitle, collaborators, timeAgoShort, getProfileCached,  collaboratorUIDs} = useBoardAndCollaborators(boardId)
   const collaboratorProfiles = useCollaboratorProfiles(collaboratorUIDs);
+
+    // Persist settings in localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("boardSettings", JSON.stringify(settings));
+  }, [settings]);
 
   // -------------------- Toast helper --------------------
   const showToast = (msg, type = 'info', duration = 5000) => {
@@ -500,6 +512,7 @@ const handleDeleteBoard = async (boardIdParam) => {
       { /* show loader while images are loading */ }
       <Loader visible={imagesLoading} text={`Loading ${boardTitle ? boardTitle : 'board'}…`} />
 
+
         {/* back button  */}
         <button className="fixed-back-btn" onClick={() => navigate(-1)} aria-label="Go back" title="Back">
         {/* simple left chevron SVG */}
@@ -510,9 +523,6 @@ const handleDeleteBoard = async (boardIdParam) => {
 
       {/* boardpage HEADER kinda */}
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
-        
-        {/* LEFT spacer: reserve same visual width as the floating button (56) + left offset (12) =>
-          total 68 so the right side remains exactly to the right like before */}
         <div style={{ width: 68, height: 1 }} />
         {/* board comments button (restored) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -575,20 +585,20 @@ const handleDeleteBoard = async (boardIdParam) => {
           </>
         )}
 
-          <button aria-label="Board settings"
-            title='Board settings'
-            className='onhoverbggrey'
-            onClick={()=> setSettingsmodal(true)}
-          >
-            {/* gear/settings SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"strokeLinecap="round"strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33  1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51  1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06  a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
-                  a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06  a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9  a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
-                  a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9 c0 .66.39 1.26 1 1.51h.09a2 2 0 0 1 0 4h-.09  a1.65 1.65 0 0 0-1.51 1z"
-              />
-            </svg>
-          </button>
+        <SettingsModal open={open} setOpen={setOpen} settings={settings} setSettings={setSettings} />
+
+        <button aria-label="Board settings"  title='Board settings'  className='onhoverbggrey'
+          onClick={()=> setOpen(prev => !prev)}
+        >
+          {/* gear/settings SVG */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"strokeLinecap="round"strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33  1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51  1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06  a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06  a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9  a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9 c0 .66.39 1.26 1 1.51h.09a2 2 0 0 1 0 4h-.09  a1.65 1.65 0 0 0-1.51 1z"
+            />
+          </svg>
+        </button>
 
           <div style={{ position: 'relative' }} ref={menuRef}>
             <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, marginTop: 8, outline: 'none' }}>
@@ -728,6 +738,7 @@ const handleDeleteBoard = async (boardIdParam) => {
         openCommentsForIndex={openCommentsForIndex}
         handleDeleteImage={handleDeleteImage}
         isMobile={isMobile}
+        settings={settings}
       />
     
       {/* Comments modal (polished, glassy, teal gradient) */}

@@ -55,6 +55,7 @@ const ImageModal = ({
   commentCounts,
   openCommentsForIndex,
   handleDeleteImage,
+  settings,
 }) => {
   if (modalIndex === null) return null;
   const [infoOpen, setInfoOpen] = React.useState(false);
@@ -305,60 +306,89 @@ React.useEffect(() => {
       >
         {/* AnimatePresence wraps a motion.div container per image.
             We set key=modalIndex so switching index mounts/unmounts the motion.div */}
-        <AnimatePresence initial={false} custom={{ dir: directionRef.current, rotation: rotationDeg }}>
-          <motion.div
-            key={currentImage?.id ?? modalIndex}            // use stable id if available
-            custom={{ dir: directionRef.current, rotation: rotationDeg }}
-            variants={imageVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            // --- add these props to solve direction bug that comes sometimes ---
-            // but it slows down if multiple imgs scroll fast is needed
-            // onAnimationStart={() => {
-            //   isAnimatingRef.current = true;
-            // }}
-            // onAnimationComplete={() => {
-            //   // complete of 'center' (enter) or 'exit' might fire — ensure we only clear after enter
-            //   // small microtask delay to avoid race (optional)
-            //   setTimeout(() => {
-            //     isAnimatingRef.current = false;
-            //   }, 0);
-            // }}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              margin: "auto",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1000,
-              pointerEvents: "auto",
-            }}
-          >
-            {/* Inner image is purely rotated by CSS so framer's translate/opacity doesn't fight rotate */}
-            <img
-              src={currentImage?.src}
-              alt="Full view"
+            {console.log('settings in modal:', settings)}
+            {console.log('settings.animateEnabled:', settings?.animateEnabled)}
+        {settings.animateEnabled ? (
+          <AnimatePresence initial={false} custom={{ dir: directionRef.current, rotation: rotationDeg }}>
+            <motion.div
+              key={currentImage?.id ?? modalIndex}            // use stable id if available
+              custom={{ dir: directionRef.current, rotation: rotationDeg }}
+              variants={imageVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
               style={{
-                display: "block",
-                maxWidth: "100%",
-                maxHeight: "100%",
-                cursor: "pointer",
-                borderRadius: "8px",
-                boxShadow: "0 0 20px rgba(0,0,0,0.4)",
-                userSelect: "none",
-                transform: `rotate(${rotationDeg}deg)`,
-                transition: "transform 300ms ease",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                margin: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                pointerEvents: "auto",
+                objectFit: "contain",
               }}
-              draggable={false}
               onClick={() => setModalIndex(null)}
-            />
-          </motion.div>
-        </AnimatePresence>
+            >
+              {/* Inner image is purely rotated by CSS so framer's translate/opacity doesn't fight rotate */}
+              <img
+                src={currentImage?.src}
+                alt="Full view"
+                style={{
+                  display: "block",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  cursor: "pointer",
+                  borderRadius: "8px",
+                  boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+                  userSelect: "none",
+                  transform: `rotate(${rotationDeg}deg)`,
+                  transition: "transform 300ms ease",
+                }}
+                draggable={false}
+                onClick={() => setModalIndex(null)}
+              />
+            </motion.div>
+        </AnimatePresence>) :
+         ( <div
+            style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                margin: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                pointerEvents: "auto",
+              }}
+              onClick={() => setModalIndex(null)}>
+                
+            <img
+                src={currentImage?.src}
+                alt="Full view"
+                style={{
+                  display: "block",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  cursor: "pointer",
+                  borderRadius: "8px",
+                  boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+                  userSelect: "none",
+                  transform: `rotate(${rotationDeg}deg)`,
+                  transition: "transform 300ms ease",
+                }}
+                draggable={false}
+                onClick={() => setModalIndex(null)}
+              />
+          </div>
+        )}
+        
 
         {/* Overflow button */}
         <div
