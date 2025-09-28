@@ -1,8 +1,297 @@
-import React, { useEffect, useRef, useState } from "react"; import { Link, useLocation, useNavigate } from "react-router-dom"; import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, } from "firebase/firestore"; import { db } from "../firebase"; import Loader from "../components/Loader";
+// BoardList.jsx
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  limit,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { db } from "../firebase";
+import Loader from "../components/Loader";
 import { motion } from "framer-motion";
 import homeicon from '../assets/home.png';
 import sharedicon from '../assets/people_10498917.png';
 
+/* ----------------------------
+   reusable tilt hook
+   ---------------------------- */
+function useTilt(ref, opts = {}) {
+  const {
+    maxX = 12,      // rotateX max
+    maxY = 16,      // rotateY max
+    parallax = 0,   // we set to 0 (you already chose Option A)
+    lerpFactor = 0.16,
+    perspective = 900, // parent perspective px
+    deadzone = 0.03, // small region around center where we snap to zero
+  } = opts;
+
+  const rafRef = useRef(null);
+  const target = useRef({ x: 0, y: 0 });
+  const current = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // ensure element rotates around center and hide backface flicker
+    el.style.transformOrigin = el.style.transformOrigin || "center center";
+    el.style.backfaceVisibility = el.style.backfaceVisibility || "hidden";
+    el.style.willChange = el.style.willChange || "transform";
+
+    // ensure a consistent perspective on the wrapper parent (only set if not set)
+    const parent = el.parentElement;
+    if (parent && !parent.style.perspective) {
+      parent.style.perspective = parent.style.perspective || `${perspective}px`;
+      parent.style.perspectiveOrigin = parent.style.perspectiveOrigin || "50% 50%";
+    }
+
+    // find likely main image inside this card (first image)
+    const innerImg = el.querySelector("img");
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    const animate = () => {
+      current.current.x = lerp(current.current.x, target.current.x, lerpFactor);
+      current.current.y = lerp(current.current.y, target.current.y, lerpFactor);
+
+      // apply transform: rotateY first then rotateX (this order reduces axis-interaction flips)
+      // translateZ last
+      el.style.transform = `rotateY(${current.current.y}deg) rotateX(${current.current.x}deg) translateZ(6px)`;
+
+      // only give image a Z push, no XY translate (you picked Option A)
+      if (innerImg) {
+        innerImg.style.transform = `translateZ(36px) scale(1.02)`;
+        innerImg.style.willChange = "transform";
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    const onPointerMove = (e) => {
+      // bounding rect in viewport
+      const rect = el.getBoundingClientRect();
+
+      // compute pointer offset from element CENTER (robust)
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      // normalized coords -1 .. 1
+      const nx = (e.clientX - cx) / (rect.width / 2);
+      const ny = (e.clientY - cy) / (rect.height / 2);
+
+      // clamp
+      const px = Math.max(-1, Math.min(1, nx));
+      const py = Math.max(-1, Math.min(1, ny));
+
+      // small deadzone near center to avoid jitter/accidental flips
+      const pxFinal = Math.abs(px) < deadzone ? 0 : px;
+      const pyFinal = Math.abs(py) < deadzone ? 0 : py;
+
+      // map to rotation targets.
+      // Note: px controls rotateY, py controls rotateX (vertical inverted so cursor up -> tilt up)
+      // Using this sign mapping + rotateY-first order gives consistent behavior.
+      target.current.y = pxFinal * (maxY * 1.5);
+      target.current.x = -pyFinal * (maxX * 1.5);
+    };
+
+    const onPointerEnter = () => {
+      el.classList.add("is-hover");
+      if (!rafRef.current) rafRef.current = requestAnimationFrame(animate);
+    };
+    const onPointerLeave = () => {
+      // reset targets
+      target.current.x = 0;
+      target.current.y = 0;
+      setTimeout(() => el.classList.remove("is-hover"), 180);
+    };
+
+    const onTouchStart = (ev) => {
+      const t = ev.touches[0];
+      onPointerEnter();
+      onPointerMove({ clientX: t.clientX, clientY: t.clientY });
+    };
+    const onTouchMove = (ev) => {
+      const t = ev.touches[0];
+      onPointerMove({ clientX: t.clientX, clientY: t.clientY });
+    };
+    const onTouchEnd = () => onPointerLeave();
+
+    el.addEventListener("pointermove", onPointerMove);
+    el.addEventListener("pointerenter", onPointerEnter);
+    el.addEventListener("pointerleave", onPointerLeave);
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerenter", onPointerEnter);
+      el.removeEventListener("pointerleave", onPointerLeave);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      // cleanup styles
+      el.style.transform = "";
+      el.style.transformOrigin = "";
+      el.style.backfaceVisibility = "";
+      if (innerImg) innerImg.style.transform = "";
+      if (parent && parent.style && parent.style.perspective === `${perspective}px`) {
+        // don't forcibly remove parent's perspective if it was set in CSS by you;
+        // only remove if we set it here (best effort — optional)
+        // parent.style.perspective = "";
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref.current]);
+}
+
+
+/* ----------------------------
+   BoardCard (preview layout)
+   ---------------------------- */
+const SIZES = {
+  mainPercent: 0.62,
+  previewPercent: 0.38,
+  mainHeight: 180,
+  gap: 8,
+};
+
+function BoardCard({ board, imgs }) {
+  const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
+  const initial = [imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder];
+  const [cardImgs, setCardImgs] = useState(initial);
+  const mediaRef = useRef(null);
+
+  useEffect(() => {
+    setCardImgs([imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder]);
+  }, [imgs]);
+
+  const onPreviewClick = (previewIndex) => {
+    const newImgs = [...cardImgs];
+    [newImgs[0], newImgs[previewIndex]] = [newImgs[previewIndex], newImgs[0]];
+    setCardImgs(newImgs);
+  };
+
+  const coverStyles = {
+    wrapper: { display: "flex", gap: SIZES.gap, alignItems: "stretch", marginTop: 10 },
+    mainWrap: {
+      width: `${Math.round(SIZES.mainPercent * 100)}%`,
+      height: SIZES.mainHeight,
+      borderRadius: 6,
+      overflow: "hidden",
+      background: "#eaeaea",
+      flexShrink: 0,
+      position: "relative",
+    },
+    mainImg: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block",
+      pointerEvents: "none",
+    },
+    previewColumn: {
+      width: `${Math.round(SIZES.previewPercent * 100)}%`,
+      display: "flex",
+      flexDirection: "column",
+      gap: Math.max(4, Math.round(SIZES.gap / 2)),
+      alignItems: "stretch",
+    },
+    previewImg: {
+      width: "100%",
+      height: `calc(${SIZES.mainHeight / 2}px - ${Math.round(SIZES.gap / 2)}px)`,
+      borderRadius: 6,
+      overflow: "hidden",
+      background: "#eee",
+      objectFit: "cover",
+      display: "block",
+      cursor: "pointer",
+    },
+  };
+
+  return (
+    <div style={coverStyles.wrapper}>
+      <div style={coverStyles.mainWrap} aria-hidden>
+        <div ref={mediaRef} style={{ position: "absolute", inset: 0, display: "block", transformStyle: "preserve-3d", transition: "transform 220ms ease" }}>
+          <img
+            className="board-main-img"
+            alt={`board-main-${board.id}`}
+            src={cardImgs[0]}
+            style={coverStyles.mainImg}
+          />
+        </div>
+      </div>
+
+      <div style={coverStyles.previewColumn}>
+        {[1, 2].map((i) => (
+          <img
+            key={i}
+            alt={`preview-${i}`}
+            src={cardImgs[i]}
+            onClick={() => onPreviewClick(i)}
+            style={coverStyles.previewImg}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------
+   BoardTile - per-board tile (safe to use hooks)
+   ---------------------------- */
+function BoardTile({ board, imgs, to, location }) {
+  const tiltRef = useRef(null);
+  useTilt(tiltRef);
+
+  const wrapperBaseStyle = {
+    display: "block",
+    padding: 12,
+    borderRadius: 10,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    textDecoration: "none",
+    color: "inherit",
+    overflow: "hidden",
+    marginBottom: 0,
+    minHeight: SIZES.mainHeight + 40,
+    transformStyle: "preserve-3d",
+    willChange: "transform",
+    background: "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
+  };
+
+  return (
+    <div ref={tiltRef} style={wrapperBaseStyle}>
+      <Link
+        to={to}
+        state={{ background: location }}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          color: "inherit",
+          textDecoration: "none",
+        }}
+      >
+        <strong>{board.title || "Untitled Board"}</strong>
+        <div style={{ marginTop: 8 }}>
+          <BoardCard board={board} imgs={imgs} />
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/* ----------------------------
+   BoardList (main component)
+   ---------------------------- */
 export default function BoardList({ user, boardsCache, setBoardsCache, selected, setSelected }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,7 +313,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
   useEffect(() => {
     if (!user || (boardsCache && boardsCache.length > 0)) return;
 
-    // single snapshot to populate cache (we keep live listener below for selection)
     const q = query(collection(db, "boards"));
     const unsub = onSnapshot(q, (snap) => {
       const temp = [];
@@ -46,7 +334,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
   }, [boardsCache]);
 
   // ---------- latest images per board (3 most recent) ----------
-  // listense to images subcollections for boards currently in `boards`
   useEffect(() => {
     if (!user) return;
     const unsubs = [];
@@ -58,7 +345,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
         limit(3)
       );
       const unsub = onSnapshot(qImg, (snap) => {
-        // if component unmounted, ignore
         if (!mountedRef.current) return;
         const imgs = snap.docs.map((d) => d.data().src || "");
         setLatestBoardImages((prev) => ({ ...prev, [board.id]: imgs }));
@@ -75,7 +361,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
   useEffect(() => {
     if (!user) return;
 
-    // show loader when switching selection
     setLoadingBoards(true);
 
     // cleanup any previous per-board collab listeners
@@ -88,23 +373,16 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
       boardCollectionUnsubRef.current = null;
     }
 
-    // We try to order by updatedAt on server to get sensible ordering immediately.
-    // Fallback to client-side sorting by updatedAt||createdAt in case some docs
-    // are missing updatedAt.
     const qBoards = query(collection(db, "boards"), orderBy("updatedAt", "desc"));
     const boardUnsub = onSnapshot(qBoards, async (boardsSnap) => {
       if (!mountedRef.current) return;
 
-      // collect boards depending on the selected filter
       const tempBoards = [];
-
-      // We'll build a list of candidate boards and then apply filters:
       const candidateBoards = [];
       boardsSnap.forEach((boardDoc) => {
         candidateBoards.push({ id: boardDoc.id, ...boardDoc.data() });
       });
 
-      // Helper to sort by updatedAt or createdAt
       const sortByRecency = (arr) =>
         arr.sort((a, b) => {
           const aTs = (a.updatedAt?.seconds ?? a.updatedAt?.toMillis?.() ?? a.createdAt?.seconds ?? 0);
@@ -113,26 +391,16 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
         });
 
       if (selected === "My Boards") {
-        // only boards owned by me
         for (const bd of candidateBoards) {
           if (bd.ownerId === user.uid) tempBoards.push(bd);
         }
         setBoards(sortByRecency(tempBoards));
         setLoadingBoards(false);
       } else {
-        // For Shared with Me or All Boards we will set per-board collaborator listeners
-        // For performance we don't create duplicate listeners (collabUnsubsRef guards this)
-        // Also we maintain `boards` via setBoards when a collaborator entry indicates the user is part of it.
-
-        // Start with clearing boards for this view
         setBoards([]);
 
-        // We'll iterate through candidateBoards and for each board create a collaborator snapshot
-        // That snapshot will decide whether to include the board in the `boards` state.
         candidateBoards.forEach((boardData) => {
           const boardId = boardData.id;
-
-          // If we already have a listener for this board, skip
           if (collabUnsubsRef.current.has(boardId)) return;
 
           const collabQ = collection(db, "boards", boardId, "collaborators");
@@ -143,7 +411,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
             const isOwner = boardData.ownerId === user.uid;
 
             if (selected === "Shared") {
-              // include boards where user is a collaborator (but not owner)
               if (isCollaborator && !isOwner) {
                 setBoards((prev) => {
                   const without = prev.filter((b) => b.id !== boardId);
@@ -153,11 +420,11 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
               } else {
                 setBoards((prev) => prev.filter((b) => b.id !== boardId));
               }
-            } else if(selected === "Notifications") {
-              navigate('/notifications'); 
-            } else if(selected === "Friends") {
+            } else if (selected === "Notifications") {
+              navigate('/notifications');
+            } else if (selected === "Friends") {
               navigate('/friends');
-            } else if(selected === "Home") {
+            } else if (selected === "Home") {
               setSelected('My Boards');
             }
             setLoadingBoards(false);
@@ -169,7 +436,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
           collabUnsubsRef.current.set(boardId, unsub);
         });
 
-        // If there were zero candidate boards, hide loader
         if (candidateBoards.length === 0) {
           setLoadingBoards(false);
         }
@@ -182,7 +448,6 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     boardCollectionUnsubRef.current = boardUnsub;
 
     return () => {
-      // cleanup
       if (boardCollectionUnsubRef.current) {
         boardCollectionUnsubRef.current();
         boardCollectionUnsubRef.current = null;
@@ -190,35 +455,10 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
       collabUnsubsRef.current.forEach((u) => u());
       collabUnsubsRef.current.clear();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, selected]);
 
-    // ---------- styles (unchanged but kept here) ----------
-  const boardItemStyle = {
-    background:
-      "linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%)",
-    borderRadius: "var(--card-radius)",
-    overflow: "hidden",
-    boxShadow: "0 6px 18px rgba(12,12,16,0.05)",
-    cursor: "pointer",
-    position: "relative",
-  };
-
-  const styles = {
-    mainImage: {
-      borderRadius: "10px",
-      overflow: "hidden",
-      background: "#ddd",
-    },
-    mainImageImg: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-      objectPosition: "top center",
-    },
-  };
-
-  // ---------- Responsive grid logic ----------
+  /* ---------- responsive grid ---------- */
   function useWindowSize() {
     const [size, setSize] = useState({
       width: typeof window !== "undefined" ? window.innerWidth : 1200,
@@ -231,18 +471,14 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     }, []);
     return size;
   }
-
   const { width } = useWindowSize();
-
   const getColumns = () => {
     if (width < 640) return 1;
     if (width < 900) return 2;
     if (width < 1200) return 3;
     return 4;
   };
-
   const columnsCount = getColumns();
-
   const gridStyle = {
     display: "grid",
     gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
@@ -253,96 +489,12 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     borderRadius: 12,
   };
 
-  // ---------- Card sizing that scales inside each grid cell ----------
-  const SIZES = {
-    mainPercent: 0.62,
-    previewPercent: 0.38,
-    mainHeight: 180,
-    gap: 8,
-  };
-
-  const coverStyles = {
-    wrapper: { display: "flex", gap: SIZES.gap, alignItems: "stretch", marginTop: 10 },
-    mainWrap: {
-      width: `${Math.round(SIZES.mainPercent * 100)}%`,
-      height: SIZES.mainHeight,
-      borderRadius: 6,
-      overflow: "hidden",
-      background: "#eaeaea",
-      flexShrink: 0,
-    },
-    mainImg: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-      display: "block",
-    },
-    previewColumn: {
-      width: `${Math.round(SIZES.previewPercent * 100)}%`,
-      display: "flex",
-      flexDirection: "column",
-      gap: Math.max(4, Math.round(SIZES.gap / 2)),
-      alignItems: "stretch",
-    },
-    previewImg: {
-      width: "100%",
-      height: `calc(${SIZES.mainHeight / 2}px - ${Math.round(SIZES.gap / 2)}px)`,
-      borderRadius: 6,
-      overflow: "hidden",
-      background: "#eee",
-      objectFit: "cover",
-      display: "block",
-      cursor: "pointer",
-    },
-  };
-
-  const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
-
-  // BoardCard identical adapted to percent widths
-  function BoardCard({ board, imgs }) {
-    const initial = [imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder];
-    const [cardImgs, setCardImgs] = useState(initial);
-
-    useEffect(() => {
-      // if imgs change (new picture added), update the preview thumbnails immediately
-      setCardImgs([imgs[0] || placeholder, imgs[1] || placeholder, imgs[2] || placeholder]);
-    }, [imgs]);
-
-    const onPreviewClick = (previewIndex) => {
-      const newImgs = [...cardImgs];
-      [newImgs[0], newImgs[previewIndex]] = [newImgs[previewIndex], newImgs[0]];
-      setCardImgs(newImgs);
-    };
-
-    return (
-      <div style={coverStyles.wrapper}>
-        <div style={coverStyles.mainWrap}>
-          <img alt={`board-main-${board.id}`} src={cardImgs[0]} style={{ ...coverStyles.mainImg, ...styles.mainImageImg }} />
-        </div>
-
-        <div style={coverStyles.previewColumn}>
-          {[1, 2].map((i) => (
-            <img
-              key={i}
-              alt={`preview-${i}`}
-              src={cardImgs[i]}
-              onClick={() => onPreviewClick(i)}
-              style={coverStyles.previewImg}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ---------- UI styles ----------
   const filterBarStyle = {
     display: "flex",
     justifyContent: "center",
     gap: 16,
     marginBottom: 16,
   };
-
   const filterBtn = (isActive) => ({
     padding: "8px 16px",
     borderRadius: "20px",
@@ -356,7 +508,9 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     transition: "all 0.2s ease",
   });
 
-  // ---------- Render ----------
+  const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
+
+  /* ---------- render ---------- */
   return (
     <div>
       {/* Filter Tabs */}
@@ -364,31 +518,30 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
         {["My Boards", "Shared"].map((label) => (
           <motion.button
             key={label}
-            style={{...filterBtn(selected === label),
-              display: "flex",           // make button content a flex row
-              alignItems: "center",      // vertical centering
-              justifyContent: "center",  // optional: keep text centered if button is wide
-              gap: "0px", }}
+            style={{
+              ...filterBtn(selected === label),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0px",
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setSelected(label)}
           >
-            {/* Conditionally render the correct icon based on the label */}
             <img
               src={label === "My Boards" ? homeicon : sharedicon}
               alt={label === "My Boards" ? "Home Icon" : "Shared Icon"}
               height={20}
               width={20}
-              // Add a small margin to the right if you want space between the icon and text (recommended)
-               style={{ marginRight: '8px' }}
+              style={{ marginRight: '8px' }}
             />
-            {/* Display the label text next to the icon */}
             {label}
           </motion.button>
         ))}
       </div>
 
-      {/* Loader when switching views or initial load */}
+      {/* Loader */}
       <Loader visible={loadingBoards} text={`Loading ${selected ? selected : "boards"}…`} />
 
       {(!loadingBoards && boards.length === 0) ? (
@@ -400,29 +553,13 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
           const imgs = latestboardimages[board.id] || [];
           const to = `/board/${board.id}`;
           return (
-            <Link
+            <BoardTile
               key={board.id}
+              board={board}
+              imgs={imgs}
               to={to}
-              state={{ background: location }}
-              style={{
-                ...boardItemStyle,
-                display: "block",
-                padding: 12,
-                borderRadius: 10,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                textDecoration: "none",
-                color: "inherit",
-                overflow: "hidden",
-                marginBottom: 0,
-                minHeight: SIZES.mainHeight + 40,
-              }}
-            >
-              <strong>{board.title || "Untitled Board"}</strong>
-
-              <div style={{ marginTop: 8 }}>
-                <BoardCard board={board} imgs={imgs} />
-              </div>
-            </Link>
+              location={location}
+            />
           );
         })}
       </div>

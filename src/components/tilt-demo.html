@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tilt Card Demo</title>
+<style>
+  :root{
+    --card-w: 380px;
+    --card-h: 520px;
+    --accent: linear-gradient(135deg, rgba(27,153,159,0.95), rgba(43,95,168,0.95));
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: radial-gradient(1200px 600px at 10% 10%, #071226 0%, #020617 30%, #000 100%);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .stage{
+    perspective: 1100px; /* controls 3D depth */
+    width: calc(var(--card-w) + 40px);
+    height: calc(var(--card-h) + 40px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .card{
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 6px 18px rgba(0,0,0,0.5);
+    transform-style: preserve-3d;
+    transition: transform 450ms cubic-bezier(.2,.9,.1,1), box-shadow 350ms ease;
+    overflow: hidden;
+    position: relative;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    padding: 18px;
+  }
+
+  .card.is-hover {
+    box-shadow: 0 36px 80px rgba(0,0,0,0.75), 0 12px 30px rgba(0,0,0,0.55);
+  }
+
+  /* image layer (3D parallax depth) */
+  .card__media{
+    position:absolute;
+    inset:0;
+    transform-origin: center;
+    will-change: transform;
+    display:block;
+  }
+
+  .card__media img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    filter: saturate(1.02) contrast(1.02) brightness(0.96);
+    transition: transform 300ms ease;
+    pointer-events: none;
+  }
+
+  /* glossy highlight */
+  .card__gloss {
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background: linear-gradient(115deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.00) 45%);
+    mix-blend-mode: overlay;
+    opacity: 0.9;
+    transform: translateZ(60px) rotateZ(0deg);
+    will-change: transform, opacity;
+  }
+
+  /* content overlay */
+  .card__content{
+    position: relative; /* sits above media */
+    z-index: 4;
+    width:100%;
+    padding: 18px;
+    box-sizing: border-box;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:flex-start;
+  }
+
+  .title {
+    background: rgba(0,0,0,0.35);
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:0.2px;
+    backdrop-filter: blur(6px);
+  }
+
+  .meta {
+    margin-top: 8px;
+    color: #dbeafe;
+    font-size: 13px;
+    opacity: 0.9;
+    background: rgba(0,0,0,0.24);
+    padding:8px 12px;
+    border-radius: 10px;
+    font-weight:500;
+  }
+
+  .controls {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index:6;
+    display:flex;
+    gap:8px;
+  }
+
+  .chip {
+    padding:6px 10px;
+    border-radius:999px;
+    background: rgba(255,255,255,0.06);
+    font-size:13px;
+    color:#fff;
+    border: 1px solid rgba(255,255,255,0.04);
+    cursor:pointer;
+  }
+
+  /* small hint */
+  .hint {
+    position:absolute;
+    bottom:14px;
+    right:14px;
+    font-size:12px;
+    color:rgba(255,255,255,0.7);
+    z-index:6;
+    background: rgba(0,0,0,0.26);
+    padding:6px 10px;
+    border-radius:8px;
+  }
+
+  @media (max-width:480px){
+    :root{
+      --card-w: 320px;
+      --card-h: 440px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="card" id="card" role="img" aria-label="Tilt card demo">
+    <div class="card__media" id="media">
+      <!-- swap src with your own image or use unsplash -->
+      <img id="mediaImg" src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&q=80&auto=format&fit=crop" alt="Scenic" />
+    </div>
+
+    <div class="card__gloss" id="gloss"></div>
+
+    <div class="card__content">
+      <div class="title">PixPick — Scenic Board</div>
+      <div class="meta">Tap / move cursor to tilt • Pinch or move device to tilt on mobile</div>
+    </div>
+
+    <div class="controls">
+      <button class="chip" id="resetBtn" title="Reset tilt">Reset</button>
+    </div>
+
+    <div class="hint">Move cursor or tilt device</div>
+  </div>
+</div>
+
+<script>
+  // Tilt card: map pointer position to rotation and small parallax translate for image
+  (function(){
+    const stage = document.getElementById('stage');
+    const card = document.getElementById('card');
+    const media = document.getElementById('media');
+    const img = document.getElementById('mediaImg');
+    const gloss = document.getElementById('gloss');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // max tilt degrees
+    const MAX_TILT_X = 14; // rotateX max (tilt up/down)
+    const MAX_TILT_Y = 18; // rotateY max (tilt left/right)
+    const MEDIA_TRANSLATE = 18; // px parallax for inner image
+    const GLOSS_MOVE = 40;
+
+    let pointerInside = false;
+    let rafId = null;
+    let lastX = 0, lastY = 0;
+    let currentRotX = 0, currentRotY = 0;
+    let targetRotX = 0, targetRotY = 0;
+
+    // helper: lerp for smoothness
+    function lerp(a,b,t){ return a + (b-a) * t; }
+
+    function updateTransform(){
+      // smooth interpolate
+      currentRotX = lerp(currentRotX, targetRotX, 0.18);
+      currentRotY = lerp(currentRotY, targetRotY, 0.18);
+
+      // set card transform (push forward slightly on hover)
+      card.style.transform = `rotateX(${currentRotX}deg) rotateY(${currentRotY}deg) translateZ(6px)`;
+
+      // media parallax (opposite sign, smaller)
+      const translateX = -currentRotY / MAX_TILT_Y * MEDIA_TRANSLATE;
+      const translateY = currentRotX / MAX_TILT_X * MEDIA_TRANSLATE;
+      media.style.transform = `translate3d(${translateX}px, ${translateY}px, 40px) scale(1.02)`;
+
+      // gloss highlight moves with pointer
+      const glossX = -currentRotY / MAX_TILT_Y * GLOSS_MOVE;
+      const glossY = -currentRotX / MAX_TILT_X * GLOSS_MOVE;
+      gloss.style.transform = `translate3d(${glossX}px, ${glossY}px, 60px)`;
+
+      rafId = requestAnimationFrame(updateTransform);
+    }
+
+    // pointer move handler (desktop)
+    function onPointerMove(e){
+      pointerInside = true;
+      const bounds = card.getBoundingClientRect();
+      const px = ((e.clientX - bounds.left) / bounds.width) - 0.5; // -0.5 .. 0.5
+      const py = ((e.clientY - bounds.top) / bounds.height) - 0.5;
+
+      // invert X rotation (mouse up -> rotateX negative)
+      targetRotY = px * (MAX_TILT_Y * 2); // more sensitivity horizontally
+      targetRotX = -py * (MAX_TILT_X * 2);
+    }
+
+    function onPointerEnter(){
+      card.classList.add('is-hover');
+      if (!rafId) updateTransform();
+    }
+
+    function onPointerLeave(){
+      pointerInside = false;
+      // reset targets
+      targetRotX = 0;
+      targetRotY = 0;
+      // remove hover class after a short delay so reset looks smooth
+      setTimeout(()=> card.classList.remove('is-hover'), 240);
+    }
+
+    // device orientation support (mobile)
+    let lastOrientationTs = 0;
+    function onDeviceOrientation(e){
+      // some devices fire with high frequency; throttle a bit
+      const now = Date.now();
+      if (now - lastOrientationTs < 40) return;
+      lastOrientationTs = now;
+
+      // gamma: left-right [-90,90], beta: front-back [-180,180]
+      const gamma = e.gamma || 0; // left / right tilt
+      const beta = e.beta || 0;   // front / back tilt
+
+      // normalize expected device ranges into [-1..1]
+      const nx = Math.max(-1, Math.min(1, gamma / 30)); // gentle mapping
+      const ny = Math.max(-1, Math.min(1, beta / 30));
+
+      targetRotY = nx * MAX_TILT_Y;
+      targetRotX = -ny * MAX_TILT_X;
+
+      if (!rafId) updateTransform();
+    }
+
+    // reset button
+    resetBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      targetRotX = 0;
+      targetRotY = 0;
+    });
+
+    // pointer events
+    stage.addEventListener('pointermove', onPointerMove);
+    stage.addEventListener('pointerenter', onPointerEnter);
+    stage.addEventListener('pointerleave', onPointerLeave);
+
+    // also allow touch to act like pointer (some browsers)
+    stage.addEventListener('touchstart', (ev) => {
+      onPointerEnter();
+      const t = ev.touches[0];
+      onPointerMove(t);
+    }, { passive:true });
+
+    stage.addEventListener('touchmove', (ev) => {
+      const t = ev.touches[0];
+      onPointerMove(t);
+    }, { passive:true });
+
+    stage.addEventListener('touchend', () => {
+      onPointerLeave();
+    });
+
+    // device orientation (optional)
+    if (window.DeviceOrientationEvent) {
+      // some browsers need permission (iOS 13+). try to request on first touch/click.
+      function requestDeviceMotionPermission(){
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(permissionState => {
+            if (permissionState === 'granted') {
+              window.addEventListener('deviceorientation', onDeviceOrientation);
+            }
+          }).catch(()=>{ /* denied or not available */ });
+        } else {
+          window.addEventListener('deviceorientation', onDeviceOrientation);
+        }
+        window.removeEventListener('click', requestDeviceMotionPermission);
+        window.removeEventListener('touchstart', requestDeviceMotionPermission);
+      }
+      window.addEventListener('click', requestDeviceMotionPermission, { once:true });
+      window.addEventListener('touchstart', requestDeviceMotionPermission, { once:true });
+    }
+
+    // cleanup on unload
+    window.addEventListener('beforeunload', () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('deviceorientation', onDeviceOrientation);
+    });
+  })();
+</script>
+</body>
+</html>
