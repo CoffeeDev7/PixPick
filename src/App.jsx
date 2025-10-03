@@ -9,7 +9,7 @@ import { auth, provider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import LoginPage from './components/LoginPage';
-import { doc, setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, getDoc,setDoc, collection, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
 import Friends from './components/Friends';

@@ -280,7 +280,7 @@ function BoardTile({ board, imgs, to, location }) {
           textDecoration: "none",
         }}
       >
-        <strong>{board.title || "Untitled Board"}</strong>
+        <strong style={{ opacity: 1}}>{board.title || "Untitled Board"}</strong>
         <div style={{ marginTop: 8 }}>
           <BoardCard board={board} imgs={imgs} />
         </div>
@@ -479,6 +479,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     return 4;
   };
   const columnsCount = getColumns();
+  // board images wrapper
   const gridStyle = {
     display: "grid",
     gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
