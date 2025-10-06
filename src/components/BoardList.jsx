@@ -252,6 +252,8 @@ function BoardTile({ board, imgs, to, location }) {
   const tiltRef = useRef(null);
   useTilt(tiltRef);
 
+  const picksCount = board.picksCount || 0; // fallback if not set
+
   const wrapperBaseStyle = {
     display: "block",
     padding: 12,
@@ -281,6 +283,10 @@ function BoardTile({ board, imgs, to, location }) {
         }}
       >
         <strong style={{ opacity: 1}}>{board.title || "Untitled Board"}</strong>
+        <span style={{ margin: "0 4px", color: "#555" }}>•</span>
+        <strong style={{ fontSize: 12, color: "#444", fontSize: 13 }}>
+          {picksCount} {picksCount === 1 ? "pick" : "picks"}
+        </strong>
         <div style={{ marginTop: 8 }}>
           <BoardCard board={board} imgs={imgs} />
         </div>

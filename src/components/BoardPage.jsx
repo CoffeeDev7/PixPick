@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import {
   doc, documentId, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, deleteDoc,
-  limit, setDoc, where,
+  limit, setDoc, where, increment
 } from 'firebase/firestore';
 import './BoardPage.css'; 
 import ImageGrid from './ImageGrid'; 
@@ -252,6 +252,10 @@ useEffect(() => {
       //console.log("[Delete] Deleting Firestore doc:", imageDocRef.path);
       await deleteDoc(imageDocRef);
 
+      // 5. Success cleanup -> decrease board's picksCount
+      const boardRef = doc(db, "boards", boardId);
+      await updateDoc(boardRef, { picksCount: increment(-1) });
+
       console.log("[Delete] Successfully deleted Firestore doc:", imageId);
       showToast("Pick deleted", "success", 2500);
     } catch (err) {
@@ -320,6 +324,12 @@ useEffect(() => {
     setSelectedImages(new Set());
     setMultiSelectMode(false);
     showToast(`Deleted ${docsToDelete.length} picks`, 'success', 3500);
+
+    // decrement picksCount by that amount
+    if (docsToDelete.length > 0) {
+      const boardRef = doc(db, 'boards', boardId);
+      await updateDoc(boardRef, { picksCount: increment(-docsToDelete.length) });
+    }
 
     // If modal is open on a deleted image, close it
     if (modalIndex != null) {

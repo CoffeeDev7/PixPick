@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { db } from '../firebase';
 import {
-  doc, collection, addDoc, getDocs, updateDoc, serverTimestamp,
+  doc, collection, addDoc, getDocs, updateDoc, serverTimestamp, increment,
 } from 'firebase/firestore';
 import { FiPlus} from 'react-icons/fi';
 import { IoCloudOutline } from "react-icons/io5";
@@ -64,9 +64,13 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
 
       try {
         const boardRef = doc(db, 'boards', boardId);
-        await updateDoc(boardRef, { updatedAt: serverTimestamp() });
+        await updateDoc(boardRef, 
+          { 
+            updatedAt: serverTimestamp(),
+            picksCount: increment(1) // <--- this increments picksCount by 1
+          });
       } catch (err) {
-        console.warn('Could not update board.updatedAt', err);
+        console.warn('Could not update board.updatedAt or picksCount', err);
       }
 
       showToast('Image uploaded', 'success', 3500);
@@ -288,7 +292,10 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
 
       try {
         const boardRef = doc(db, 'boards', boardId);
-        await updateDoc(boardRef, { updatedAt: serverTimestamp() });
+        await updateDoc(boardRef, { 
+          updatedAt: serverTimestamp(),
+          picksCount: increment(1) // <--- this increments picksCount by 1
+        });
       } catch (err) {
         console.warn("Could not update board.updatedAt", err);
       }
@@ -531,19 +538,6 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
                 {dragActive ? 'Drop your image to add it' : 'Paste Box'}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                {/* <button
-                  onClick={() => { setOverlayVisible(false); setDragActive(false); setDragCounter(0); }}
-                  style={{
-                    background: 'transparent',
-                    color: '#b9c6d6',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    padding: '6px 10px',
-                    borderRadius: 8,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button> */}
                 <button
                   onClick={openFilePicker}
                   style={{
@@ -568,7 +562,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
             <textarea
               ref={pasteRef}
               className="my-textarea-input"
-              placeholder="Paste anything..."
+              placeholder="Click here to Paste anything..."
               onPaste={handlePaste}
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
