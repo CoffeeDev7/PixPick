@@ -395,6 +395,7 @@ export default function NotificationsPage({ user }) {
     border: "1px solid rgba(12,14,16,0.06)",
     background: "transparent",
     cursor: "pointer",
+    color: "#111",
   };
 
   // Inject keyframes via style tag — this is the best way to keep everything self-contained
@@ -526,7 +527,7 @@ export default function NotificationsPage({ user }) {
                         e.stopPropagation();
                         await openNotification(n);
                       }}
-                      style={{ ...markButton, padding: "8px 10px", fontSize: 13 }}
+                      style={{ ...markButton, padding: "8px 10px", fontSize: 13}}
                     >
                       Open
                     </button>

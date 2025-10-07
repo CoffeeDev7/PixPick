@@ -5,7 +5,7 @@ import {
   doc, collection, addDoc, getDocs, updateDoc, serverTimestamp, increment,
 } from 'firebase/firestore';
 import { FiPlus} from 'react-icons/fi';
-import { IoCloudOutline } from "react-icons/io5";
+import { AiFillPicture } from "react-icons/ai";
 import { supabase } from '../lib/supabase';
 
 const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast, setLastOpenedShort }, ref) => {
@@ -553,7 +553,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
                     boxShadow: '0 4px 12px rgba(31,111,235,0.3)',
                   }}
                 >
-                  <IoCloudOutline size={20} style={{ marginRight: 6, position: 'relative', top: -1 }} />
+                  <AiFillPicture size={20} style={{ marginRight: 6, position: 'relative', top: -1 }} />
                   Choose file
                 </button>
               </div>

@@ -282,7 +282,7 @@ function BoardTile({ board, imgs, to, location }) {
           textDecoration: "none",
         }}
       >
-        <strong style={{ opacity: 1}}>{board.title || "Untitled Board"}</strong>
+        <strong style={{ opacity: 1, color: "#222"}}>{board.title || "Untitled Board"}</strong>
         <span style={{ margin: "0 4px", color: "#555" }}>•</span>
         <strong style={{ fontSize: 12, color: "#444", fontSize: 13 }}>
           {picksCount} {picksCount === 1 ? "pick" : "picks"}

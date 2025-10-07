@@ -263,10 +263,10 @@ useEffect(() => {
       {/* header area --- use isBoardPage computed above */}
       {!isBoardPage && (
         <div style={{ backgroundColor: '#1b999fff', padding: '12px 0', display: 'flex', alignItems: 'center', gap: '12px', position: 'fixed', left: 0, right: 0, top: 0, height: '45px', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
-          <button onClick={() => setSidebarVisible(true)} style={{ fontSize: '24px', background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: '-12px' }}>☰</button>
+          <button onClick={() => setSidebarVisible(true)} style={{ color: '#222', fontSize: '24px', background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: '-12px' }}>☰</button>
           
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit', flexGrow: 1 }}>
-            <h2 style={{ margin: 0, fontFamily: "'Pacifico', cursive", fontSize: '1.8rem', color: '#151616ff' }}>PixPick</h2>
+            <h2 style={{ margin: 0, fontFamily: "'Pacifico', ", fontSize: '1.8rem', color: '#151616ff' }}>PixPick</h2>
           </Link>
 
           {/* Notifications bell */}
