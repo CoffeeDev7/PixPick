@@ -8,6 +8,7 @@ import {
   persistentMultipleTabManager,
   enableIndexedDbPersistence, // fallback only
 } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
 /**
  * Client Firebase config — safe to be public (browser SDK)
@@ -72,3 +73,6 @@ if (typeof window === "undefined") {
 
 // single named export for db (no redeclaration)
 export { db };
+
+// Realtime Database export (signal channel)
+export const rtdb = getDatabase(app);

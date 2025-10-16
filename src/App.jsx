@@ -243,6 +243,59 @@ useEffect(() => {
     return () => document.removeEventListener('mousedown', handleProfileOutside);
   }, [profileMenuOpen]);
 
+    // auto navigate to open img when deep link notification received
+  useEffect(() => {
+    if (!user) return;
+    let isFirstSnapshot = true;
+    const handledRef = new Set(); // dedupe handled notification ids
+
+    const q = query(collection(db, 'users', user.uid, 'notifications'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, async (snap) => {
+      // skip initial batch (historical)
+      if (isFirstSnapshot) {
+        snap.docs.forEach(d => handledRef.add(String(d.id)));
+        isFirstSnapshot = false;
+        return;
+      }
+
+      snap.docChanges().forEach(async (chg) => {
+        if (chg.type !== 'added') return;
+        const id = String(chg.doc.id);
+        if (handledRef.has(id)) return;
+        handledRef.add(id);
+
+        const data = chg.doc.data();
+        if (!data) return;
+
+        // Only handle open_image deep-link notifications from others that include a URL
+        if (data.type === 'open_image' && data.url && data.actor !== user.uid) {
+          try {
+            // optional: ignore stale notifications older than 30s
+            const createdAt = data.createdAt && data.createdAt.seconds ? data.createdAt.seconds * 1000 : null;
+            if (createdAt && (Date.now() - createdAt) > 30_000) {
+              // mark read and skip stale
+              await updateDoc(doc(db, 'users', user.uid, 'notifications', id), { read: true }).catch(()=>{});
+              return;
+            }
+
+            // navigate once to the provided url (BoardPage.useDeepLinkImageOpen will open the modal)
+            navigate(data.url, { replace: false });
+
+            // mark read so it won't retrigger
+            await updateDoc(doc(db, 'users', user.uid, 'notifications', id), { read: true });
+          } catch (err) {
+            console.warn('auto-navigate (open_image) failed', err);
+          }
+        }
+      });
+    }, (err) => {
+      console.error('auto navigate notifications listener error', err);
+    });
+
+    return () => unsub();
+  }, [user, navigate]);
+
+
   // Don't render anything until we know auth state
   if (authLoading) {
     return (
@@ -266,7 +319,7 @@ useEffect(() => {
           <button onClick={() => setSidebarVisible(true)} style={{ color: '#222', fontSize: '24px', background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: '-12px' }}>☰</button>
           
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit', flexGrow: 1 }}>
-            <h2 style={{ margin: 0, fontFamily: "'Pacifico', ", fontSize: '1.8rem', color: '#151616ff' }}>PixPick</h2>
+            <h2 style={{ margin: 0, fontFamily: "'Cherry Bomb One ", fontSize: '1.8rem', color: '#151616ff' }}>PixPick</h2>
           </Link>
 
           {/* Notifications bell */}
