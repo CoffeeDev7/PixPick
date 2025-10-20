@@ -23,6 +23,8 @@ import {
 import Loader from './Loader';
 import { SettingsModal } from './modals/SettingsModal';
 
+import BoardCommentsDrawer from './modals/BoardCommentsDrawer';
+
 // Default settings
 const defaultSettings = {
   animateEnabled: true,
@@ -777,12 +779,14 @@ const handleDeleteBoard = async (boardIdParam) => {
       />
 
       {/* Board comments modal — polished glassy teal style */}
-      <BoardCommentsModal
-        boardCommentsUnsubRef={boardCommentsUnsubRef} openBoardComments={openBoardComments} boardCommentModalOpen={boardCommentModalOpen}
-        setBoardCommentModalOpen={setBoardCommentModalOpen} boardCommentList={boardCommentList} setBoardCommentList={setBoardCommentList}
-        user={user} collaboratorProfiles={collaboratorProfiles} boardCommentText={boardCommentText}  setBoardCommentText={setBoardCommentText}
-        boardNotifyFriends={boardNotifyFriends} setBoardNotifyFriends={setBoardNotifyFriends} timeAgoShort={timeAgoShort}  showToast={showToast} boardId={boardId} boardTitle={boardTitle} collaborators={collaborators}
-      />
+      <BoardCommentsDrawer open={boardCommentModalOpen} onClose={() => setBoardCommentModalOpen(false)} width={400}>
+        <BoardCommentsModal
+          boardCommentsUnsubRef={boardCommentsUnsubRef} openBoardComments={openBoardComments} boardCommentModalOpen={boardCommentModalOpen}
+          setBoardCommentModalOpen={setBoardCommentModalOpen} boardCommentList={boardCommentList} setBoardCommentList={setBoardCommentList}
+          user={user} collaboratorProfiles={collaboratorProfiles} boardCommentText={boardCommentText}  setBoardCommentText={setBoardCommentText}
+          boardNotifyFriends={boardNotifyFriends} setBoardNotifyFriends={setBoardNotifyFriends} timeAgoShort={timeAgoShort}  showToast={showToast} boardId={boardId} boardTitle={boardTitle} collaborators={collaborators}
+        />
+      </BoardCommentsDrawer>
 
       {/* Toast */}
       <Toast toast={toast} setToast={setToast} />

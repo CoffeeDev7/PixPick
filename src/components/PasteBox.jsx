@@ -120,6 +120,8 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
   }
 
   // PASTE handler (keeps your advanced URL logic)
+  // ...existing code...
+  // PASTE handler (keeps your advanced URL logic)
   const handlePaste = async (event) => {
     let handled = false;
 
@@ -138,8 +140,6 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
               await saveImageToFirestore(e.target.result);
             };
             reader.readAsDataURL(file);
-            // wait for reader to finish is handled by onload above (async awaited)
-            // since we don't block here, mark handled and let the rest of function skip text processing
           }
           handled = true;
         }
@@ -157,18 +157,48 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
     const isDataUrl = text.startsWith('data:image/');
     const isDirectImageLink = /^https?:\/\/.+\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(text);
     const isGoogleAppProxy = /images\.app\.goo\.gl/i.test(text);
-    const isGoogleImgresRedirect = /google\.com\/imgres.*[?&]imgurl=/i.test(text);
+    const isGoogleImgresRedirect = /google\.com\/imgres/i.test(text);
     const isBrokenGoogleImageCopy = /google\.com\/url\?sa=i/i.test(text);
     const isLikelyImage = isLikelyImageUrl(text);
 
-    if (isGoogleAppProxy) {
+    // Handle Google Images "imgres" links: try to extract the real image URL from the imgurl param
+    if (isGoogleImgresRedirect) {
+      try {
+        const u = new URL(text);
+        const real = u.searchParams.get('imgurl') || u.searchParams.get('imgrefurl') || u.searchParams.get('q');
+        if (real) {
+          // decode in case it's encoded and ensure it's an absolute url
+          const decoded = decodeURIComponent(real);
+          // only attempt if it looks like an image or likely image url
+          if (/^data:image\//.test(decoded) || /^https?:\/\//i.test(decoded) || isLikelyImageUrl(decoded)) {
+            try {
+              await saveImageToFirestore(decoded);
+              handled = true;
+            } catch (err) {
+              console.warn('Failed to import image from imgres imgurl param:', err);
+              showToast("⚠️ Couldn't import the underlying image from this Google Images link. Open the image in a new tab and copy the image directly.", 'error', 6000);
+              handled = true;
+            }
+          } else {
+            // fallback: inform user how to copy the real image
+            showToast("⚠️ This Google Images link redirects. Open the image in a new tab, then right‑click the image and choose 'Copy image address'.");
+            handled = true;
+          }
+        } else {
+          // no imgurl param present — show the existing guidance
+          showToast("⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'.");
+          handled = true;
+        }
+      } catch (err) {
+        console.warn('Error parsing imgres URL:', err);
+        showToast("⚠️ Couldn't parse the Google Images link. Try opening the image in a new tab and copying the image directly.", 'error', 5000);
+        handled = true;
+      }
+    } else if (isGoogleAppProxy) {
       showToast("⚠️ Can't preview this Google image link. Open it in browser, then copy image directly.");
       handled = true;
     } else if (isBrokenGoogleImageCopy) {
       showToast("⚠️ 'Copy Link Address' from Google Images doesn't work. Try 'Copy Image' or 'Copy Image Address' instead.");
-      handled = true;
-    } else if (isGoogleImgresRedirect) {
-      showToast("⚠️ This is a Google redirect link. Open the image, right-click, and choose 'Copy Image'.");
       handled = true;
     } else if (isDataUrl) {
       await saveImageToFirestore(text);
@@ -203,6 +233,7 @@ const PasteBox = forwardRef(({ modalIndex, boardId, boardTitle, user, showToast,
       if (event.target) event.target.value = '';
     }
   };
+// ...existing code...
 
   // DROP handler (files or dragged links)
   const handleDrop = async (event) => {

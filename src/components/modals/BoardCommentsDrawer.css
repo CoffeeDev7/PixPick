@@ -1,0 +1,98 @@
+/* backdrop */
+.pp-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.36);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+  z-index: 1300;
+}
+.pp-drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* drawer */
+.pp-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateX(100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,250,255,0.96) 100%);
+  border-left: 1px solid rgba(16,24,32,0.06);
+  box-shadow: -28px 24px 80px rgba(10,20,30,0.28);
+  display: flex;
+  flex-direction: column;
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
+  z-index: 1350;
+  overflow: hidden;
+  will-change: transform;
+  min-width: 360px;
+}
+.pp-drawer.open {
+  transform: translateX(0);
+}
+
+/* header: mimic Google Photos header spacing */
+.pp-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.25));
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(16,24,32,0.04);
+}
+.pp-drawer-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+.pp-drawer-close {
+  font-size: 18px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.pp-drawer-close:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+/* body: scrollable region with nice padding */
+.pp-drawer-body {
+  padding: 14px 16px;
+  overflow: auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* a few niceties for nested content: make any internal modal content stretch */
+.pp-drawer.gphotos .comments-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* sticky composer at bottom if nested component uses class .composer */
+.pp-drawer .composer {
+  margin-top: auto;
+  border-top: 1px solid rgba(16,24,32,0.04);
+  padding-top: 12px;
+}
+
+/* responsive: on small screens take full screen */
+@media (max-width: 720px) {
+  .pp-drawer {
+    width: 100% !important;
+    max-width: 100%;
+  }
+  .pp-drawer-header { padding: 12px; }
+}

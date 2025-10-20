@@ -143,14 +143,14 @@ const BoardCommentsModal = ({
           aria-modal="true"
           aria-label="Board comments"
           style={{
-            width: "94%",
-            maxWidth: 720,
-            maxHeight: "80vh",
+            width: "294%",
+            
+            height: "107%",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
             borderRadius: 14,
-            background: "linear-gradient(180deg, rgba(255,255,255,0.86), rgba(248,252,253,0.9))",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.86), rgba(69, 185, 214, 0.9))",
             border: "1px solid rgba(255,255,255,0.6)",
             boxShadow: "0 28px 70px rgba(6,10,14,0.36)",
             animation: "modal-pop 220ms cubic-bezier(.2,.9,.2,1)",
@@ -189,7 +189,7 @@ const BoardCommentsModal = ({
                 🗨️
               </div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800 }}>Board Comments</div>
+                <div style={{ fontSize: 16, fontWeight: 400 }}>{boardTitle}</div>
                 <div style={{ fontSize: 12, opacity: 0.95 }}>Discuss the board with collaborators</div>
               </div>
             </div>
@@ -375,7 +375,7 @@ const BoardCommentsModal = ({
               <input
                 value={boardCommentText}
                 onChange={(e) => setBoardCommentText(e.target.value)}
-                placeholder="Write a comment..."
+                placeholder="Say Something ..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { 
                     e.preventDefault();
