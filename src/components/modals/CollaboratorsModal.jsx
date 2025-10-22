@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { PLACEHOLDERS } from "../../lib/images";
 
 const CollaboratorsModal = ({ isOpen, onClose, collaboratorProfiles }) => {
   const dialogRef = useRef(null);
@@ -145,8 +146,11 @@ const CollaboratorsModal = ({ isOpen, onClose, collaboratorProfiles }) => {
                 }}
               >
                 <img
-                  src={profile.photoURL || "/public/eat (1).png"}
+                  src={profile.photoURL || PLACEHOLDERS.profile}
                   alt={profile.displayName || "Unknown User"}
+                  onError={(e)=>{
+                    e.currentTarget.src = PLACEHOLDERS.profile;
+                  }}
                   style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                 />
               </div>

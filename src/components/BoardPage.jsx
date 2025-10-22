@@ -24,6 +24,7 @@ import Loader from './Loader';
 import { SettingsModal } from './modals/SettingsModal';
 
 import BoardCommentsDrawer from './modals/BoardCommentsDrawer';
+import { PLACEHOLDERS, setImgFallback } from '../lib/images';
 
 // Default settings
 const defaultSettings = {
@@ -544,6 +545,41 @@ const handleDeleteBoard = async (boardIdParam) => {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
 
+          {/* board comments button */}
+          <button
+            aria-label="Board comments"
+            onClick={openBoardComments}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              position: "relative",
+            }}
+          >
+            {/* chat bubble svg */}
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <svg width="20" height="20"  viewBox="0 0 24 24"fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+
+              {/* count badge */}
+              {boardCommentsCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute", top: -6, right: -6, background: "#2d95baff", color: "#fff", borderRadius: "50%", padding: "2px 6px", fontSize: 11, fontWeight: 600, lineHeight: 1, }}
+                >
+                  {boardCommentsCount}
+                </span>
+              )}
+            </div>
+
+            {/* <span style={{ fontSize: 16, color: "#0f0f0fff" }}>Board comments</span> */}
+          </button>
+
         {/* Multi-select toggle */}
         <button
           onClick={() => {
@@ -629,56 +665,24 @@ const handleDeleteBoard = async (boardIdParam) => {
                 <span style={{ fontSize: 16, color: "#0f0f0fff" }}>Rename</span>
               </button>
 
-          {/* reorder toggle */}
-          <button
-            aria-pressed={reorderMode}
-            onClick={toggleReorder}
-            title={reorderMode ? "Finish reordering" : "Reorder images"}
-            className={`onhoverbggrey ${reorderMode ? "active" : ""}`}
-          >
-            {/* reorder SVG (subtle grid-like icon) */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={reorderMode ? '#fff' : '#333'} strokeWidth="1.8">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          <span style={{ fontSize: 16 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
-          </button>
-
+              {/* reorder toggle */}
               <button
-                aria-label="Board comments"
-                onClick={openBoardComments}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  position: "relative",
-                }}
+                aria-pressed={reorderMode}
+                onClick={toggleReorder}
+                title={reorderMode ? "Finish reordering" : "Reorder images"}
+                className={`onhoverbggrey ${reorderMode ? "active" : ""}`}
               >
-                {/* chat bubble svg */}
-                <div style={{ position: "relative", display: "inline-block" }}>
-                  <svg width="20" height="20"  viewBox="0 0 24 24"fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-
-                  {/* count badge */}
-                  {boardCommentsCount > 0 && (
-                    <span
-                      style={{
-                        position: "absolute", top: -6, right: -6, background: "#2d95baff", color: "#fff", borderRadius: "50%", padding: "2px 6px", fontSize: 11, fontWeight: 600, lineHeight: 1, }}
-                    >
-                      {boardCommentsCount}
-                    </span>
-                  )}
-                </div>
-
-                <span style={{ fontSize: 16, color: "#0f0f0fff" }}>Board comments</span>
+                {/* reorder SVG (subtle grid-like icon) */}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={reorderMode ? '#fff' : '#333'} strokeWidth="1.8">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              <span style={{ fontSize: 16 }}>{reorderMode ? 'Done' : 'Reorder'}</span>
               </button>
+
+              
 
               <button onClick={() => handleDeleteBoard(boardId)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b82b2b' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -701,7 +705,7 @@ const handleDeleteBoard = async (boardIdParam) => {
       {/* Collaborators */}
       <div onClick={openCollaboratorsModal} style={{ cursor: 'pointer', display: 'flex', width: 'fit-content',alignItems: 'center', gap: '10px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }} title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}>
         {collaboratorProfiles.map((profile, i) => {
-        const photo = profile.photoURL || "/public/eat (1).png"; // fallback image
+        const photo = profile.photoURL && profile.photoURL !== 'null' ? profile.photoURL : PLACEHOLDERS.profile; // use centralized placeholder
         const name = profile.displayName || "Unknown User";
 
         return (
@@ -710,6 +714,7 @@ const handleDeleteBoard = async (boardIdParam) => {
             src={photo}
             alt={name}
             title={`${name} (${profile.uid})`}
+            onError={(e) => setImgFallback(e.currentTarget, PLACEHOLDERS.profile)}
             style={{
               width: '32px',
               height: '32px',
@@ -747,6 +752,7 @@ const handleDeleteBoard = async (boardIdParam) => {
 
 
       {/* Images grid */}
+      {images.length !== 0 && !imagesLoading && (
       <ImageGrid
         images={images}
         reorderMode={reorderMode}
@@ -756,6 +762,21 @@ const handleDeleteBoard = async (boardIdParam) => {
         selectedImages={selectedImages}
         toggleSelectImage={toggleSelectImage}
       />
+      )}
+      
+      {/* show when no images in board */}
+      {/* Empty board state */}
+      {images.length === 0 && !imagesLoading && (
+        <div className="empty-board">
+          <img
+            src={PLACEHOLDERS.boardEmpty}
+            alt="Empty board"
+            className="empty-board__image"
+          />
+          <p className="empty-board__title">This board is empty..</p>
+          
+        </div>
+      )}
 
 
       {/* Modal */}
@@ -779,7 +800,7 @@ const handleDeleteBoard = async (boardIdParam) => {
       />
 
       {/* Board comments modal — polished glassy teal style */}
-      <BoardCommentsDrawer open={boardCommentModalOpen} onClose={() => setBoardCommentModalOpen(false)} width={400}>
+      <BoardCommentsDrawer open={boardCommentModalOpen} onClose={() => setBoardCommentModalOpen(false)} width={300}>
         <BoardCommentsModal
           boardCommentsUnsubRef={boardCommentsUnsubRef} openBoardComments={openBoardComments} boardCommentModalOpen={boardCommentModalOpen}
           setBoardCommentModalOpen={setBoardCommentModalOpen} boardCommentList={boardCommentList} setBoardCommentList={setBoardCommentList}

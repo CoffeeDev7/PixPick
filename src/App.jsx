@@ -13,6 +13,8 @@ import { doc, getDoc,setDoc, collection, onSnapshot, query, orderBy, updateDoc }
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
 import Friends from './components/Friends';
+import './App.css'
+import { PLACEHOLDERS } from './lib/images';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -530,7 +532,10 @@ useEffect(() => {
             {profileMenuOpen && (
               <div style={{ position: 'absolute', right: 0, top: '46px', width: 200, background: '#fff', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', padding: 12, zIndex: 220 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <img src={user.photoURL || '/default-avatar.png'} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: 'cover' }} />
+                  <img 
+                    src={user.photoURL || '/default-avatar.png'}
+                    alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: 'cover' }}
+                    onError={(e)=> e.currentTarget.src = PLACEHOLDERS.profile} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700 }}>{user.displayName}</div>
                     <div style={{ fontSize: 12, color: '#666' }}>{user.email}</div>

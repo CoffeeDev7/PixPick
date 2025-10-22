@@ -1,5 +1,10 @@
 /* BoardPage.css */
 .boardpage{
+  overflow-y: auto;               /* ensure it's scrollable */
+  -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE 10+ */
+  
    /* ensure it at least fills the viewport */
   min-height: 100vh;
   background: linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%);
@@ -14,25 +19,42 @@
   flex-direction: column;
 }
 
-.image-grid {
-  column-count: 6;
-  column-gap: 12px;
+.empty-board {
+  min-height: 60vh;                 /* centers naturally in content area */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background: linear-gradient(90deg, rgba(141,167,168,1) 0%, rgba(141,167,168,1) 50%, rgba(141,167,168,1) 100%);;              /* subtle Google grey */
+  border-radius: 16px;
+
+  text-align: center;
+  padding: 32px;
 }
-@media (max-width: 1200px) {
-  .image-grid {
-    column-count: 5;
-  }
+
+.empty-board__image {
+  width: 180px;
+  height: auto;
+  opacity: 0.85;
+  margin-bottom: 16px;
 }
-@media (max-width: 992px) {
-  .image-grid {
-    column-count: 4;
-  }
+
+.empty-board__title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #202124;                   /* Google primary text */
+  margin: 0;
 }
-@media (max-width: 768px) {
-  .image-grid {
-    column-count: 2;
-  }
+
+.empty-board__subtitle {
+  font-size: 14px;
+  color: #5f6368;                   /* Google secondary text */
+  margin-top: 6px;
+  max-width: 320px;
 }
+
+
 .image-item {
   break-inside: avoid;
   margin-bottom: 12px;

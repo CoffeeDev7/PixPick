@@ -254,6 +254,7 @@ function BoardTile({ board, imgs, to, location }) {
 
   const picksCount = board.picksCount || 0; // fallback if not set
 
+  // Card/Tile wrapper color
   const wrapperBaseStyle = {
     display: "block",
     padding: 12,
@@ -485,13 +486,16 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     return 4;
   };
   const columnsCount = getColumns();
-  // board images wrapper
+
+  // Board images wrapper
+  //const IMAGES_WRAPPER_COLOR = "linear-gradient(to right top, #408083, #408083, #408083, #408083, #408083)";
+  const IMAGES_WRAPPER_COLOR = "transparent";
   const gridStyle = {
     display: "grid",
     gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
     gap: 12,
     alignItems: "start",
-    background: "linear-gradient(to right top, #408083, #408083, #408083, #408083, #408083)",
+    background: IMAGES_WRAPPER_COLOR,
     padding: 12,
     borderRadius: 12,
   };
@@ -515,6 +519,7 @@ export default function BoardList({ user, boardsCache, setBoardsCache, selected,
     transition: "all 0.2s ease",
   });
 
+  // default placeholder image
   const placeholder = "https://picsum.photos/seed/pixpick-21/800/450";
 
   /* ---------- render ---------- */
