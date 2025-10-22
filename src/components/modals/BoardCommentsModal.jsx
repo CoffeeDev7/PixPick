@@ -133,7 +133,7 @@ const BoardCommentsModal = ({
           background: "linear-gradient(180deg, rgba(6,18,20,0.18), rgba(6,18,20,0.28))",
           backdropFilter: "blur(6px) saturate(1.05)",
           WebkitBackdropFilter: "blur(6px) saturate(1.05)",
-          padding: 20,
+          padding: "20px 0px 20px 0px",
         }}
       >
         {/* modal surface */}
@@ -149,7 +149,7 @@ const BoardCommentsModal = ({
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            borderRadius: 14,
+            borderRadius: 0,
             background: "linear-gradient(180deg, rgba(255,255,255,0.86), rgba(69, 185, 214, 0.9))",
             border: "1px solid rgba(255,255,255,0.6)",
             boxShadow: "0 28px 70px rgba(6,10,14,0.36)",
@@ -189,8 +189,8 @@ const BoardCommentsModal = ({
                 🗨️
               </div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 400 }}>{boardTitle}</div>
-                <div style={{ fontSize: 12, opacity: 0.95 }}>Discuss the board with collaborators</div>
+                <div style={{ fontSize: 16, fontWeight: 500, color:"black" }}>{boardTitle}</div>
+                <div style={{ fontSize: 12, opacity: 0.95, color:"#333" }}>Chat with collaborators</div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

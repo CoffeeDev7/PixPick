@@ -13,6 +13,7 @@ import { doc, getDoc,setDoc, collection, onSnapshot, query, orderBy, updateDoc }
 import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
 import Friends from './components/Friends';
+import './App.css'
 
 export default function App() {
   const [user, setUser] = useState(null);
