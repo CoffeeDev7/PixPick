@@ -42,7 +42,7 @@ export default function LoginPage({login}) {
       maxWidth: '90%',
       boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
     }}>
-      <h2 style={{ marginBottom: '20px' }}>Welcome to PixPick</h2>
+      <h2 style={{ marginBottom: '20px' }}>Welcome to Disneyland</h2>
       <button
         onClick={login}
         style={{
