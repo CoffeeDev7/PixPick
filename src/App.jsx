@@ -14,10 +14,7 @@ import { db } from './firebase';
 import bellicon from './assets/bell_552745.png';
 import Friends from './components/Friends';
 import './App.css'
-<<<<<<< HEAD
 import { PLACEHOLDERS } from './lib/images';
-=======
->>>>>>> f3c33fc87033085e8d53cfe8bcc3426dbe735066
 
 export default function App() {
   const [user, setUser] = useState(null);
