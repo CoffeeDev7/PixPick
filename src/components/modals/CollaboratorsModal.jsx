@@ -120,92 +120,94 @@ const CollaboratorsModal = ({
         </div>
 
         <div className="access-modal__body">
-          <section className="access-modal__section access-modal__section--share">
-            <div className="access-modal__section-head">
-              <div>
-                <h4>Share this board</h4>
-                <p>Send the link, then add the person so they can actually open it.</p>
-              </div>
-            </div>
-
-            <div className="access-modal__share-card">
-              <div className="access-modal__share-copy">
-                <span>Share link</span>
-                <strong>{String(shareLink || "").replace(/^https?:\/\//, "")}</strong>
-              </div>
-              <div className="access-modal__button-row">
-                <button type="button" className="access-modal__ghost-btn" onClick={onCopyLink}>
-                  Copy link
-                </button>
-                <button type="button" className="access-modal__primary-btn" onClick={onShareBoard}>
-                  {canUseNativeShare ? "Share board" : "Share board"}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="access-modal__section">
-            <div className="access-modal__section-head">
-              <div>
-                <h4>Add collaborator</h4>
-                <p>Invite by email. Best case: someone who has already signed into PixPick with Google.</p>
-              </div>
-            </div>
-
-            <form className="access-modal__invite-form" onSubmit={handleSubmit}>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => {
-                  setInviteEmail(e.target.value);
-                  if (feedback) setFeedback(null);
-                }}
-                placeholder="name@example.com"
-                className="access-modal__email-input"
-                autoComplete="email"
-              />
-              <button type="submit" className="access-modal__primary-btn" disabled={invitePending}>
-                {invitePending ? "Adding..." : "Add collaborator"}
-              </button>
-            </form>
-
-            {visibleSuggestions.length > 0 && (
-              <div className="access-modal__suggestions">
-                <span className="access-modal__suggestions-label">Recent people</span>
-                <div className="access-modal__suggestions-list">
-                  {visibleSuggestions.map((entry) => (
-                    <button
-                      key={entry.email}
-                      type="button"
-                      className="access-modal__suggestion-chip"
-                      onClick={() => {
-                        setInviteEmail(entry.email);
-                        setFeedback(null);
-                      }}
-                    >
-                      <img
-                        src={entry.photoURL || PLACEHOLDERS.profile}
-                        alt={entry.displayName || entry.email}
-                        onError={(e) => {
-                          e.currentTarget.src = PLACEHOLDERS.profile;
-                        }}
-                      />
-                      <span>
-                        <strong>{entry.displayName || entry.email}</strong>
-                        <small>{entry.email}</small>
-                      </span>
-                    </button>
-                  ))}
+          <div className="access-modal__top-grid">
+            <section className="access-modal__section access-modal__section--share">
+              <div className="access-modal__section-head">
+                <div>
+                  <h4>Share this board</h4>
+                  <p>Send the link, then add the person so they can actually open it.</p>
                 </div>
               </div>
-            )}
 
-            {feedback?.text && (
-              <div className={`access-modal__feedback is-${feedback.type}`}>{feedback.text}</div>
-            )}
-          </section>
+              <div className="access-modal__share-card">
+                <div className="access-modal__share-copy">
+                  <span>Share link</span>
+                  <strong>{String(shareLink || "").replace(/^https?:\/\//, "")}</strong>
+                </div>
+                <div className="access-modal__button-row">
+                  <button type="button" className="access-modal__ghost-btn" onClick={onCopyLink}>
+                    Copy link
+                  </button>
+                  <button type="button" className="access-modal__primary-btn" onClick={onShareBoard}>
+                    {canUseNativeShare ? "Share board" : "Share board"}
+                  </button>
+                </div>
+              </div>
+            </section>
 
-          <section className="access-modal__section">
+            <section className="access-modal__section">
+              <div className="access-modal__section-head">
+                <div>
+                  <h4>Add collaborator</h4>
+                  <p>Invite by email. Best case: someone who has already signed into PixPick with Google.</p>
+                </div>
+              </div>
+
+              <form className="access-modal__invite-form" onSubmit={handleSubmit}>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => {
+                    setInviteEmail(e.target.value);
+                    if (feedback) setFeedback(null);
+                  }}
+                  placeholder="name@example.com"
+                  className="access-modal__email-input"
+                  autoComplete="email"
+                />
+                <button type="submit" className="access-modal__primary-btn" disabled={invitePending}>
+                  {invitePending ? "Adding..." : "Add collaborator"}
+                </button>
+              </form>
+
+              {visibleSuggestions.length > 0 && (
+                <div className="access-modal__suggestions">
+                  <span className="access-modal__suggestions-label">Recent people</span>
+                  <div className="access-modal__suggestions-list">
+                    {visibleSuggestions.map((entry) => (
+                      <button
+                        key={entry.email}
+                        type="button"
+                        className="access-modal__suggestion-chip"
+                        onClick={() => {
+                          setInviteEmail(entry.email);
+                          setFeedback(null);
+                        }}
+                      >
+                        <img
+                          src={entry.photoURL || PLACEHOLDERS.profile}
+                          alt={entry.displayName || entry.email}
+                          onError={(e) => {
+                            e.currentTarget.src = PLACEHOLDERS.profile;
+                          }}
+                        />
+                        <span>
+                          <strong>{entry.displayName || entry.email}</strong>
+                          <small>{entry.email}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {feedback?.text && (
+                <div className={`access-modal__feedback is-${feedback.type}`}>{feedback.text}</div>
+              )}
+            </section>
+          </div>
+
+          <section className="access-modal__section access-modal__section--access">
             <div className="access-modal__section-head">
               <div>
                 <h4>{accessEntries.length} people with access</h4>
@@ -213,9 +215,10 @@ const CollaboratorsModal = ({
               </div>
             </div>
 
-            <div className="access-modal__list">
+            <div className="access-modal__list-shell">
+              <div className="access-modal__list">
               {accessEntries.map((profile) => (
-                <div key={profile.uid} className="access-modal__person-card">
+                <div key={profile.uid || profile.email || profile.displayName} className="access-modal__person-card">
                   <div className="access-modal__avatar-wrap">
                     <img
                       src={profile.photoURL || PLACEHOLDERS.profile}
@@ -240,6 +243,7 @@ const CollaboratorsModal = ({
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           </section>
         </div>
