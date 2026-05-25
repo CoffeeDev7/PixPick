@@ -34,73 +34,6 @@ const defaultSettings = {
   // add more variables here as needed
 };
 
-const boardActionBarStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '6px 8px',
-  borderRadius: 18,
-  background: 'rgba(255,255,255,0.8)',
-  border: '1px solid rgba(15,23,42,0.08)',
-  boxShadow: '0 14px 32px rgba(15,23,42,0.08)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-};
-
-const boardIconButtonStyle = {
-  background: 'transparent',
-  border: 'none',
-  cursor: 'pointer',
-  padding: 8,
-  minHeight: 36,
-  minWidth: 36,
-  borderRadius: 12,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#23303b',
-};
-
-const RECENT_SHARE_LIMIT = 6;
-
-function normalizeEmail(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function getRecentShareStorageKey(uid) {
-  return uid ? `pixpick_recent_shares_${uid}` : null;
-}
-
-function loadRecentShares(uid) {
-  const key = getRecentShareStorageKey(uid);
-  if (!key) return [];
-
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((entry) => entry?.email)
-      .map((entry) => ({
-        email: normalizeEmail(entry.email),
-        displayName: entry.displayName || normalizeEmail(entry.email),
-        photoURL: entry.photoURL || '',
-      }));
-  } catch (err) {
-    console.warn('Could not read recent shares', err);
-    return [];
-  }
-}
-
-function persistRecentShares(uid, entries) {
-  const key = getRecentShareStorageKey(uid);
-  if (!key) return;
-  localStorage.setItem(key, JSON.stringify(entries));
-}
-
 export default function BoardPage({ user }) {
   const { id: boardId } = useParams();
   const navigate = useNavigate();
@@ -149,7 +82,6 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
 
   // Collaborators modal
   const [isCollaboratorsModalOpen, setIsCollaboratorsModalOpen] = useState(false);
-  const [recentShares, setRecentShares] = useState([]);
 
   const openCollaboratorsModal = () => setIsCollaboratorsModalOpen(true);
   const closeCollaboratorsModal = () => setIsCollaboratorsModalOpen(false);
@@ -178,25 +110,6 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const { boardTitle, lastOpenedShort, setLastOpenedShort } = useFetchBoardTitle(boardId);
   const { setBoardTitle, collaborators, timeAgoShort, getProfileCached,  collaboratorUIDs} = useBoardAndCollaborators(boardId)
   const collaboratorProfiles = useCollaboratorProfiles(collaboratorUIDs);
-  const collaboratorMeta = new Map(collaborators.map((entry) => [entry.id, entry]));
-  const accessEntries = [...collaboratorProfiles]
-    .map((profile) => ({
-      ...profile,
-      role: collaboratorMeta.get(profile.uid)?.role || (profile.uid === user?.uid ? 'owner' : 'collaborator'),
-      isCurrentUser: profile.uid === user?.uid,
-    }))
-    .sort((left, right) => {
-      const leftPriority = left.role === 'owner' ? 0 : left.isCurrentUser ? 1 : 2;
-      const rightPriority = right.role === 'owner' ? 0 : right.isCurrentUser ? 1 : 2;
-      if (leftPriority !== rightPriority) return leftPriority - rightPriority;
-      return (left.displayName || left.email || '').localeCompare(right.displayName || right.email || '');
-    });
-  const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/board/${boardId}` : `/board/${boardId}`;
-  const canUseNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-
-  useEffect(() => {
-    setRecentShares(loadRecentShares(user?.uid));
-  }, [user?.uid]);
 
     // Persist settings in localStorage whenever they change
   useEffect(() => {
@@ -207,24 +120,6 @@ const [reorderMode, setReorderMode] = useState(false); // toggles jiggle & drag;
   const showToast = (msg, type = 'info', duration = 5000) => {
     setToast({ msg, type, duration });
     setTimeout(() => setToast(null), duration);
-  };
-
-  const rememberRecentShare = (entry) => {
-    if (!user?.uid || !entry?.email) return;
-
-    setRecentShares((prev) => {
-      const next = [
-        {
-          email: normalizeEmail(entry.email),
-          displayName: entry.displayName || normalizeEmail(entry.email),
-          photoURL: entry.photoURL || '',
-        },
-        ...prev.filter((item) => normalizeEmail(item.email) !== normalizeEmail(entry.email)),
-      ].slice(0, RECENT_SHARE_LIMIT);
-
-      persistRecentShares(user.uid, next);
-      return next;
-    });
   };
 
 
@@ -455,51 +350,74 @@ useEffect(() => {
 };
 
   // -------------------- Share board logic --------------------
-const handleInviteCollaborator = async (rawEmail) => {
-  const email = normalizeEmail(rawEmail);
-  const ownerUid = collaborators.find((entry) => entry.role === 'owner')?.id || user?.uid;
+const handleShareBoard = () => {
+  // make a quick overlay with an input + your card
+  const overlay = document.createElement("div");
+  overlay.style = `
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #fff; padding: 16px; border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; gap: 12px; z-index: 9999;
+    width: 300px;
+  `;
+  overlay.innerHTML = `
+    <label style="font-weight: bold;">Enter email to share:</label>
+    <input type="text" id="shareEmailInput" placeholder="Enter email"
+      style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%;" />
+    <div id="quickCard" style="
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      padding: 8px; border: 1px solid #eee; border-radius: 6px;
+      background: #f9f9f9;
+    ">
+      <img src="https://lh3.googleusercontent.com/a/ACg8ocIeDVvBYzPUvLuvJvrLEZ_m32K__iYmw1dKDc-WQnQXWlhRASdC=s96-c"
+        style="width:36px; height:36px; border-radius:50%;" />
+      <div style="display:flex; flex-direction:column;">
+        <strong>Karthik</strong>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap: 8px;">
+      <button id="cancelShareBtn" style="padding:6px 12px;">Cancel</button>
+      <button id="confirmShareBtn" style="padding:6px 12px; background:#4caf50; color:#fff; border:none; border-radius:4px;">Share</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 
-  if (!email) {
-    return { ok: false, message: 'Enter an email address to invite someone.' };
-  }
+  const input = overlay.querySelector("#shareEmailInput");
+  const quickCard = overlay.querySelector("#quickCard");
+  const cancelBtn = overlay.querySelector("#cancelShareBtn");
+  const confirmBtn = overlay.querySelector("#confirmShareBtn");
 
-  if (email === normalizeEmail(user?.email)) {
-    return { ok: false, message: 'You already have access to this board.' };
-  }
+  quickCard.onclick = () => {
+    input.value = "satyakarthik2020@gmail.com"; // autofill
+  };
 
-  const existingAccess = accessEntries.find((entry) => normalizeEmail(entry.email) === email);
-  if (existingAccess) {
-    return {
-      ok: false,
-      message: `${existingAccess.displayName || existingAccess.email} already has access to this board.`,
-    };
-  }
+  cancelBtn.onclick = () => {
+    document.body.removeChild(overlay);
+  };
 
+  confirmBtn.onclick = async () => {
+    const email = input.value.trim();
+    if (!email) return;
+    await shareWithEmail(email);
+    document.body.removeChild(overlay);
+  };
+};
+
+const shareWithEmail = async (email) => {
   try {
     const q = query(collection(db, "users"), where("email", "==", email));
     const snap = await getDocs(q);
     if (snap.empty) {
-      const message = 'That email has not signed into PixPick with Google yet.';
-      showToast(message, 'error', 3200);
-      return { ok: false, message };
+      showToast("User not found", "error", 3000);
+      return;
     }
-
     const userDoc = snap.docs[0];
     const uid = userDoc.id;
-    const profile = userDoc.data() || {};
-
-    if (uid === user?.uid) {
-      return { ok: false, message: 'You already have access to this board.' };
-    }
 
     await setDoc(doc(db, "boards", boardId, "collaborators", uid), {
       role: "collaborator",
       addedAt: serverTimestamp(),
-      addedBy: user.uid,
-      boardId,
-      boardTitle,
-      ownerId: ownerUid,
-    }, { merge: true });
+    });
 
     try {
       const payload = {
@@ -516,62 +434,10 @@ const handleInviteCollaborator = async (rawEmail) => {
       console.warn("Could not create share notification", err);
     }
 
-    rememberRecentShare({
-      email,
-      displayName: profile.displayName || email,
-      photoURL: profile.photoURL || '',
-    });
-
-    const message = `${profile.displayName || email} can access this board now.`;
-    showToast(message, 'success', 2600);
-    return { ok: true, message };
+    showToast("Board shared", "success", 2500);
   } catch (err) {
     console.error("share board error", err);
-    const message = 'Could not add collaborator right now.';
-    showToast(message, 'error', 3000);
-    return { ok: false, message };
-  }
-};
-
-const handleCopyBoardLink = async () => {
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(shareLink);
-    } else {
-      const helper = document.createElement('textarea');
-      helper.value = shareLink;
-      helper.setAttribute('readonly', '');
-      helper.style.position = 'absolute';
-      helper.style.left = '-9999px';
-      document.body.appendChild(helper);
-      helper.select();
-      document.execCommand('copy');
-      document.body.removeChild(helper);
-    }
-
-    showToast('Board link copied. People still need access to open it.', 'success', 2600);
-  } catch (err) {
-    console.error('copy board link error', err);
-    showToast('Could not copy the board link.', 'error', 2800);
-  }
-};
-
-const handleShareBoard = async () => {
-  if (!canUseNativeShare) {
-    await handleCopyBoardLink();
-    return;
-  }
-
-  try {
-    await navigator.share({
-      title: boardTitle || 'PixPick board',
-      text: `Open ${boardTitle || 'this board'} in PixPick`,
-      url: shareLink,
-    });
-  } catch (err) {
-    if (err?.name === 'AbortError') return;
-    console.error('native share error', err);
-    showToast('Could not open the share sheet.', 'error', 2800);
+    showToast("Could not share board", "error", 3000);
   }
 };
 
@@ -669,13 +535,13 @@ const handleDeleteBoard = async (boardIdParam) => {
         </button>
 
       {/* boardpage HEADER kinda */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
         <div style={{ width: 68, height: 1 }} />
         {/* board comments button (restored) */}
-        <div style={boardActionBarStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 
           {/* share board button */}
-          <button onClick={openCollaboratorsModal} title="Board access" style={boardIconButtonStyle}>
+          <button onClick={handleShareBoard}  title="Share board" className='onhoverbggrey'>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
 
@@ -684,7 +550,10 @@ const handleDeleteBoard = async (boardIdParam) => {
             aria-label="Board comments"
             onClick={openBoardComments}
             style={{
-              ...boardIconButtonStyle,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 8,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -723,11 +592,10 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? '#4dabeeff' : 'transparent',
                 color: selectedImages.size > 0 ? '#efefef' : '#333',
                 border: 'none',
-                padding: '8px 12px',
-                borderRadius: 12,
+                padding: '8px 10px',
+                borderRadius: 8,
                 cursor: 'pointer',
                 outline: 'none',
-                minHeight: 36,
               }}
         >
           {multiSelectMode ? 'Cancel' : 'Select'}
@@ -742,10 +610,9 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
                 color: selectedImages.size > 0 ? '#efefef' : '#666',
                 border: 'none',
-                padding: '8px 12px',
-                borderRadius: 12,
+                padding: '8px 10px',
+                borderRadius: 8,
                 cursor: 'pointer' ,
-                minHeight: 36,
               }}
             >
               {selectedImages.size === images.length ? 'Clear' : 'Select all'}
@@ -758,8 +625,8 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? '#ee6c4d' : 'rgba(0,0,0,0.06)',
                 color: selectedImages.size > 0 ? '#efefef' : '#666',
                 border: 'none',
-                padding: '8px 12px',
-                borderRadius: 12,
+                padding: '8px 10px',
+                borderRadius: 8,
                 cursor: 'pointer'
               }}
               title="Delete selected picks"
@@ -771,9 +638,8 @@ const handleDeleteBoard = async (boardIdParam) => {
 
         <SettingsModal open={open} setOpen={setOpen} settings={settings} setSettings={setSettings} />
 
-        <button aria-label="Board settings"  title='Board settings'
+        <button aria-label="Board settings"  title='Board settings'  className='onhoverbggrey'
           onClick={()=> setOpen(prev => !prev)}
-          style={boardIconButtonStyle}
         >
           {/* gear/settings  */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"strokeLinecap="round"strokeLinejoin="round">
@@ -786,7 +652,7 @@ const handleDeleteBoard = async (boardIdParam) => {
         </button>
 
           <div style={{ position: 'relative' }} ref={menuRef}>
-            <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ ...boardIconButtonStyle, marginTop: 0, outline: 'none' }}>
+            <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, marginTop: 8, outline: 'none' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
             </button>
 
@@ -867,14 +733,7 @@ const handleDeleteBoard = async (boardIdParam) => {
         <CollaboratorsModal
           isOpen={isCollaboratorsModalOpen}
           onClose={closeCollaboratorsModal}
-          boardTitle={boardTitle}
-          accessEntries={accessEntries}
-          recentShares={recentShares}
-          shareLink={shareLink}
-          canUseNativeShare={canUseNativeShare}
-          onInviteCollaborator={handleInviteCollaborator}
-          onCopyLink={handleCopyBoardLink}
-          onShareBoard={handleShareBoard}
+          collaboratorProfiles={collaboratorProfiles}
         />
 
       </div>
