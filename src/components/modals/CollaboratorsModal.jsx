@@ -1,46 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { PLACEHOLDERS } from "../../lib/images";
-import "./CollaboratorsModal.css";
 
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getRoleLabel(role) {
-  if (role === "owner") return "Owner";
-  if (role === "viewer") return "Viewer";
-  return "Can edit";
-}
-
-const CollaboratorsModal = ({
-  isOpen,
-  onClose,
-  boardTitle,
-  accessEntries,
-  recentShares,
-  shareLink,
-  canUseNativeShare,
-  onInviteCollaborator,
-  onCopyLink,
-  onShareBoard,
-}) => {
+const CollaboratorsModal = ({ isOpen, onClose, collaboratorProfiles }) => {
+  const dialogRef = useRef(null);
   const overlayRef = useRef(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [invitePending, setInvitePending] = useState(false);
-  const [feedback, setFeedback] = useState(null);
-
-  const collaboratorEmails = useMemo(
-    () => new Set((accessEntries || []).map((entry) => normalizeEmail(entry.email)).filter(Boolean)),
-    [accessEntries]
-  );
-
-  const visibleSuggestions = useMemo(
-    () =>
-      (recentShares || []).filter(
-        (entry) => entry?.email && !collaboratorEmails.has(normalizeEmail(entry.email))
-      ),
-    [collaboratorEmails, recentShares]
-  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,199 +12,187 @@ const CollaboratorsModal = ({
       if (e.key === "Escape") onClose();
     };
 
+    const onPointer = (e) => {
+      const dialog = dialogRef.current;
+      const overlay = overlayRef.current;
+      if (!dialog || !overlay) return;
+      if (e.target === overlay || !dialog.contains(e.target)) onClose();
+    };
+
     window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
     };
   }, [isOpen, onClose]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setInviteEmail("");
-    setFeedback(null);
-  }, [isOpen]);
-
   if (!isOpen) return null;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email) {
-      setFeedback({ type: "error", text: "Enter an email address to add a collaborator." });
-      return;
-    }
-
-    setInvitePending(true);
-    setFeedback(null);
-
-    try {
-      const result = await onInviteCollaborator(email);
-      if (result?.message) {
-        setFeedback({ type: result.ok ? "success" : "error", text: result.message });
-      }
-      if (result?.ok) setInviteEmail("");
-    } finally {
-      setInvitePending(false);
-    }
-  };
 
   return (
     <div
       ref={overlayRef}
-      className="access-modal-overlay"
-      onMouseDown={(e) => {
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1500,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        // a touch darker so cards pop more
+        background: "rgba(6,9,14,0.64)",
+        backdropFilter: "blur(12px) saturate(150%)",
+        WebkitBackdropFilter: "blur(12px) saturate(150%)",
+        padding: "20px",
+      }}
+      onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
       <div
-        className="access-modal"
-        onMouseDown={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        onClick={() => onClose()} // keeps your "click panel closes" behavior
         role="dialog"
         aria-modal="true"
-        aria-label="Board access"
+        aria-label="Collaborators"
+        style={{
+          width: "90%",
+          maxWidth: "560px",
+          // stronger frosted card so it reads well
+          background: "linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.14))",
+          borderRadius: "16px",
+          border: "1px solid rgba(255,255,255,0.14)",
+          boxShadow: "0 18px 60px rgba(2,6,23,0.72)",
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          cursor: "pointer",
+          color: "#071026", // darker text for contrast
+          transition: "transform 160ms ease, opacity 160ms ease",
+        }}
       >
-        <div className="access-modal__hero">
-          <div>
-            <span className="access-modal__eyebrow">Board access</span>
-            <h3>{boardTitle || "Untitled board"}</h3>
-            <p>Private by default. People need to sign in with Google before they can open this board.</p>
-          </div>
+        {/* header */}
+        <div
+          style={{
+            padding: "18px 22px",
+            borderBottom: "1px solid rgba(2,6,23,0.06)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.12))",
+            userSelect: "none",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Collaborators</h3>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
             aria-label="Close"
-            className="access-modal__close"
+            style={{
+              background: "transparent",
+              border: "none",
+              fontSize: "20px",
+              cursor: "pointer",
+              color: "inherit",
+            }}
           >
             ×
           </button>
         </div>
 
-        <div className="access-modal__body">
-          <section className="access-modal__section access-modal__section--share">
-            <div className="access-modal__section-head">
-              <div>
-                <h4>Share this board</h4>
-                <p>Send the link, then add the person so they can actually open it.</p>
-              </div>
-            </div>
-
-            <div className="access-modal__share-card">
-              <div className="access-modal__share-copy">
-                <span>Share link</span>
-                <strong>{String(shareLink || "").replace(/^https?:\/\//, "")}</strong>
-              </div>
-              <div className="access-modal__button-row">
-                <button type="button" className="access-modal__ghost-btn" onClick={onCopyLink}>
-                  Copy link
-                </button>
-                <button type="button" className="access-modal__primary-btn" onClick={onShareBoard}>
-                  {canUseNativeShare ? "Share board" : "Share board"}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="access-modal__section">
-            <div className="access-modal__section-head">
-              <div>
-                <h4>Add collaborator</h4>
-                <p>Invite by email. Best case: someone who has already signed into PixPick with Google.</p>
-              </div>
-            </div>
-
-            <form className="access-modal__invite-form" onSubmit={handleSubmit}>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => {
-                  setInviteEmail(e.target.value);
-                  if (feedback) setFeedback(null);
+        {/* body */}
+        <div
+          style={{
+            padding: "18px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            maxHeight: "72vh",
+            overflowY: "auto",
+          }}
+        >
+          {collaboratorProfiles.map((profile) => (
+            <div
+              key={profile.uid}
+              // If you ever want this row to NOT close the modal on click, add onClick={(e)=>e.stopPropagation()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                padding: "12px",
+                borderRadius: "12px",
+                // noticeably more opaque and with contrast border + elevated shadow
+                background: "linear-gradient(180deg, rgba(255,255,255,0.54), rgba(255,255,255,0.52))",
+                border: "1px solid rgba(10,15,25,0.06)",
+                boxShadow: "0 8px 22px rgba(2,6,23,0.10)",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  boxShadow: "0 6px 16px rgba(2,6,23,0.12)",
+                  border: "2px solid rgba(255,255,255,0.9)",
                 }}
-                placeholder="name@example.com"
-                className="access-modal__email-input"
-                autoComplete="email"
+              >
+                <img
+                  src={profile.photoURL || PLACEHOLDERS.profile}
+                  alt={profile.displayName || "Unknown User"}
+                  onError={(e)=>{
+                    e.currentTarget.src = PLACEHOLDERS.profile;
+                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    color: "#071026",
+                  }}
+                >
+                  {profile.displayName || "Unknown User"}
+                </div>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#475569",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {profile.email || "No email provided"}
+                </div>
+              </div>
+
+              <span
+                title="Online"
+                style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  backgroundColor: profile.status === "online" ? "#16a34a" : "#94a3b8",
+                  boxShadow: profile.status === "online" ? "0 0 8px rgba(22,163,74,0.14)" : "none",
+                  flexShrink: 0,
+                }}
               />
-              <button type="submit" className="access-modal__primary-btn" disabled={invitePending}>
-                {invitePending ? "Adding..." : "Add collaborator"}
-              </button>
-            </form>
-
-            {visibleSuggestions.length > 0 && (
-              <div className="access-modal__suggestions">
-                <span className="access-modal__suggestions-label">Recent people</span>
-                <div className="access-modal__suggestions-list">
-                  {visibleSuggestions.map((entry) => (
-                    <button
-                      key={entry.email}
-                      type="button"
-                      className="access-modal__suggestion-chip"
-                      onClick={() => {
-                        setInviteEmail(entry.email);
-                        setFeedback(null);
-                      }}
-                    >
-                      <img
-                        src={entry.photoURL || PLACEHOLDERS.profile}
-                        alt={entry.displayName || entry.email}
-                        onError={(e) => {
-                          e.currentTarget.src = PLACEHOLDERS.profile;
-                        }}
-                      />
-                      <span>
-                        <strong>{entry.displayName || entry.email}</strong>
-                        <small>{entry.email}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {feedback?.text && (
-              <div className={`access-modal__feedback is-${feedback.type}`}>{feedback.text}</div>
-            )}
-          </section>
-
-          <section className="access-modal__section">
-            <div className="access-modal__section-head">
-              <div>
-                <h4>{accessEntries.length} people with access</h4>
-                <p>Owner first, then everyone who can currently open this board.</p>
-              </div>
             </div>
-
-            <div className="access-modal__list">
-              {accessEntries.map((profile) => (
-                <div key={profile.uid} className="access-modal__person-card">
-                  <div className="access-modal__avatar-wrap">
-                    <img
-                      src={profile.photoURL || PLACEHOLDERS.profile}
-                      alt={profile.displayName || "Unknown User"}
-                      onError={(e) => {
-                        e.currentTarget.src = PLACEHOLDERS.profile;
-                      }}
-                      className="access-modal__avatar"
-                    />
-                  </div>
-
-                  <div className="access-modal__person-copy">
-                    <strong>{profile.displayName || "Unknown User"}</strong>
-                    <span>{profile.email || "No email provided"}</span>
-                  </div>
-
-                  <div className="access-modal__badges">
-                    {profile.isCurrentUser && <span className="access-modal__badge access-modal__badge--self">You</span>}
-                    <span className={`access-modal__badge access-modal__badge--${profile.role || "collaborator"}`}>
-                      {getRoleLabel(profile.role)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          ))}
         </div>
       </div>
     </div>
