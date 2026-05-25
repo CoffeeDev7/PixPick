@@ -34,6 +34,33 @@ const defaultSettings = {
   // add more variables here as needed
 };
 
+const boardActionBarStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '6px 8px',
+  borderRadius: 18,
+  background: 'rgba(255,255,255,0.8)',
+  border: '1px solid rgba(15,23,42,0.08)',
+  boxShadow: '0 14px 32px rgba(15,23,42,0.08)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+};
+
+const boardIconButtonStyle = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: 8,
+  minHeight: 36,
+  minWidth: 36,
+  borderRadius: 12,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#23303b',
+};
+
 const RECENT_SHARE_LIMIT = 6;
 
 function normalizeEmail(value) {
@@ -642,13 +669,13 @@ const handleDeleteBoard = async (boardIdParam) => {
         </button>
 
       {/* boardpage HEADER kinda */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0px', alignItems: 'flex-start' }}>
         <div style={{ width: 68, height: 1 }} />
         {/* board comments button (restored) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={boardActionBarStyle}>
 
           {/* share board button */}
-          <button onClick={openCollaboratorsModal}  title="Board access" className='onhoverbggrey'>
+          <button onClick={openCollaboratorsModal} title="Board access" style={boardIconButtonStyle}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
 
@@ -657,10 +684,7 @@ const handleDeleteBoard = async (boardIdParam) => {
             aria-label="Board comments"
             onClick={openBoardComments}
             style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 8,
+              ...boardIconButtonStyle,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -699,10 +723,11 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? '#4dabeeff' : 'transparent',
                 color: selectedImages.size > 0 ? '#efefef' : '#333',
                 border: 'none',
-                padding: '8px 10px',
-                borderRadius: 8,
+                padding: '8px 12px',
+                borderRadius: 12,
                 cursor: 'pointer',
                 outline: 'none',
+                minHeight: 36,
               }}
         >
           {multiSelectMode ? 'Cancel' : 'Select'}
@@ -717,9 +742,10 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
                 color: selectedImages.size > 0 ? '#efefef' : '#666',
                 border: 'none',
-                padding: '8px 10px',
-                borderRadius: 8,
+                padding: '8px 12px',
+                borderRadius: 12,
                 cursor: 'pointer' ,
+                minHeight: 36,
               }}
             >
               {selectedImages.size === images.length ? 'Clear' : 'Select all'}
@@ -732,8 +758,8 @@ const handleDeleteBoard = async (boardIdParam) => {
                 background: selectedImages.size > 0 ? '#ee6c4d' : 'rgba(0,0,0,0.06)',
                 color: selectedImages.size > 0 ? '#efefef' : '#666',
                 border: 'none',
-                padding: '8px 10px',
-                borderRadius: 8,
+                padding: '8px 12px',
+                borderRadius: 12,
                 cursor: 'pointer'
               }}
               title="Delete selected picks"
@@ -745,8 +771,9 @@ const handleDeleteBoard = async (boardIdParam) => {
 
         <SettingsModal open={open} setOpen={setOpen} settings={settings} setSettings={setSettings} />
 
-        <button aria-label="Board settings"  title='Board settings'  className='onhoverbggrey'
+        <button aria-label="Board settings"  title='Board settings'
           onClick={()=> setOpen(prev => !prev)}
+          style={boardIconButtonStyle}
         >
           {/* gear/settings  */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"strokeLinecap="round"strokeLinejoin="round">
@@ -759,7 +786,7 @@ const handleDeleteBoard = async (boardIdParam) => {
         </button>
 
           <div style={{ position: 'relative' }} ref={menuRef}>
-            <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, marginTop: 8, outline: 'none' }}>
+            <button aria-label="Board menu" onClick={() => setShowBoardMenu((s) => !s)} style={{ ...boardIconButtonStyle, marginTop: 0, outline: 'none' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
             </button>
 
