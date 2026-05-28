@@ -1,4 +1,5 @@
 // BoardPage.jsx 
+import PresenceBeacon from './PresenceBeacon';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
@@ -702,40 +703,52 @@ const handleDeleteBoard = async (boardIdParam) => {
         </h2>
       </div>
             
-      {/* Collaborators */}
-      <div onClick={openCollaboratorsModal} style={{ cursor: 'pointer', display: 'flex', width: 'fit-content',alignItems: 'center', gap: '10px', marginTop: '6px', marginBottom: '12px', position: 'relative', marginLeft: '8px' }} title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}>
-        {collaboratorProfiles.map((profile, i) => {
-        const photo = profile.photoURL && profile.photoURL !== 'null' ? profile.photoURL : PLACEHOLDERS.profile; // use centralized placeholder
-        const name = profile.displayName || "Unknown User";
-
-        return (
-          <img
-            key={profile.uid}
-            src={photo}
-            alt={name}
-            title={`${name} (${profile.uid})`}
-            onError={(e) => setImgFallback(e.currentTarget, PLACEHOLDERS.profile)}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              transform: `translateX(-${i * 10}px)`,
-              zIndex: collaboratorProfiles.length - i,
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
-            }}
+        
+      {/* Collaborators + dummy viewer */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', marginLeft: '8px', gap: '12px' }}>
+        {/* Collaborators */}
+        <div
+          onClick={openCollaboratorsModal}
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}
+          title={collaboratorProfiles.length > 0 ? collaboratorProfiles.map(p => p.displayName || 'Unknown User').join(', ') : 'No collaborators'}
+        >
+          {collaboratorProfiles.map((profile, i) => {
+            const photo = profile.photoURL && profile.photoURL !== 'null' ? profile.photoURL : PLACEHOLDERS.profile;
+            const name = profile.displayName || "Unknown User";
+            return (
+              <img
+                key={profile.uid}
+                src={photo}
+                alt={name}
+                title={`${name} (${profile.uid})`}
+                onError={(e) => setImgFallback(e.currentTarget, PLACEHOLDERS.profile)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  objectFit: 'cover',
+                  transform: `translateX(-${i * 10}px)`,
+                  zIndex: collaboratorProfiles.length - i,
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
+                }}
+              />
+            );
+          })}
+          <CollaboratorsModal
+            isOpen={isCollaboratorsModalOpen}
+            onClose={closeCollaboratorsModal}
+            collaboratorProfiles={collaboratorProfiles}
           />
+        </div>
 
-        );
-        })}
+        {/* New presence beacon with sound & fade */}
+  <PresenceBeacon name="Subash" />
 
-        {/* The new modal component */}
-        <CollaboratorsModal
-          isOpen={isCollaboratorsModalOpen}
-          onClose={closeCollaboratorsModal}
-          collaboratorProfiles={collaboratorProfiles}
-        />
-
+        {/* dummy "viewing" message */}
+        {/* Modern viewing indicator */}
+{/* Floating Presence Beacon */}
+{/* <div className="presence-beacon">
+  <div className="user-cursor-dot" /> 
+  <span className="presence-text">Subash is here</span>
+</div> */}
       </div>
 
       {/* Paste box */}

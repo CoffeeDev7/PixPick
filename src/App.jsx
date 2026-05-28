@@ -720,8 +720,24 @@ useEffect(() => {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ padding: isBoardPage? '0rem': '0.8rem', marginTop: isBoardPage ? '0px' : 'calc(60px + 12px)', transition: 'margin-top 0.3s ease' ,
-        background:'linear-gradient(90deg,rgba(162, 161, 166, 1) 0%, rgba(201, 211, 212, 1) 55%, rgba(145, 162, 163, 1) 100%)'}}>
+      <div 
+        style={{
+          padding: isBoardPage? "0rem":"0.8rem",
+          marginTop: isBoardPage? 0 : "72px",
+          transition: "margin-top 0.3s ease",
+          boxSizing:"border-box",
+
+          
+          // Full page fill (mobile -safe viewport unit)
+          minHeight: isBoardPage? "100dvh": "calc(100dvh - 72px)",
+          
+          //Keep gradient visible even if image/content is short
+          backgroundColor: "#c9d3d4",
+          backgroundImage:
+          "linear-gradient(90deg, rgba(162,161,161,1) 0%, rgba(201,211,212,1) 55%, rgba(145,162,163,1) 100%)",
+          backgroundRepeat:"no-repeat",
+          backgroundSize:"cover",}}>
+
           {/* Note: render main routes using backgroundLocation OR the current location.
             That way, when backgroundLocation exists, the router will render the background
             (BoardList) while we render the modal below for the current location. */}
